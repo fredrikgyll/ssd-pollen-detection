@@ -1,0 +1,20 @@
+{
+    "python.languageServer": "Pylance",
+    "python.analysis.extraPaths": [
+        "model/"
+    ],
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.linting.enabled": true,
+    "python.pythonPath": "/Users/fredrikg/.pyenv/versions/pollen/bin/python",
+    "python.formatting.provider": "black",
+    "editor.formatOnSave": true,
+    "python.linting.mypyEnabled": false,
+    "python.testing.pytestArgs": [
+        "model"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.nosetestsEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "autoDocstring.docstringFormat": "sphinx"
+}
