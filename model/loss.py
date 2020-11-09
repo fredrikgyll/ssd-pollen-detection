@@ -2,23 +2,27 @@ import torch
 import torch.nn as nn
 
 from torch import Tensor
+from utils import point_form
 
 
 class MultiBoxLoss(nn.Module):
-    def __init__(self, dboxes: Tensor) -> None:
+    def __init__(self, dboxes: Tensor, batch_size: int) -> None:
         super(MultiBoxLoss, self).__init__()
-        self.dboxes = dboxes
+        self.dboxes = point_form(dboxes).expand(batch_size, -1, -1)
+        self.batch_size = batch_size
         self.loc_loss_func = nn.SmoothL1Loss(reduce=False)
         self.conf_loss_func = nn.CrossEntropyLoss(reduce=False)
 
     def _to_offsets(self, gloc):
-        dxy = self.dboxes[:, :2, :]
-        dwh = self.dboxes[:, 2:, :]
-        gxy = gloc[:, :2, :]
-        gwh = gloc[:, 2:, :]
+        assert gloc.size() == torch.Size([self.batch_size, 8732, 4])
+
+        dxy = self.dboxes[:, :, :2]
+        dwh = self.dboxes[:, :, 2:]
+        gxy = gloc[:, :, :2]
+        gwh = gloc[:, :, 2:]
         gxy = (gxy - dxy) / dwh
         gwh = (gwh / dwh).log()
-        return torch.cat((gxy, gwh), dim=1).contiguous()
+        return torch.cat((gxy, gwh), dim=2).contiguous()
 
     def hard_negative_mining(self, loss, mask, pos_num):
         # postive mask will never selected
@@ -36,16 +40,24 @@ class MultiBoxLoss(nn.Module):
         return closs
 
     def forward(
-        self, ploc: Tensor, plabel: Tensor, gloc: Tensor, glabel: Tensor
+        self, ploc: Tensor, pconf: Tensor, gloc: Tensor, glabel: Tensor
     ) -> Tensor:
+
+        assert ploc.size() == torch.Size([self.batch_size, 8732, 4])
+        assert gloc.size() == torch.Size([self.batch_size, 8732, 4])
+        assert glabel.size() == torch.Size([self.batch_size, 8732])
+        assert pconf.size() == torch.Size([self.batch_size, 2, 8732])
+        assert ploc.size() == gloc.size()
+
         mask = glabel > 0
         num_pos = mask.sum(dim=1)
 
         gloc_offset = self._to_offsets(gloc)
-        loc_loss = self.loc_loss_func(ploc, gloc_offset).sum(dim=1)
+        loc_loss = self.loc_loss_func(ploc, gloc_offset)
+        loc_loss = loc_loss.sum(dim=2)
         loc_loss = (mask * loc_loss).sum(dim=1)
 
-        closs = self.conf_loss_func(plabel, glabel)
+        closs = self.conf_loss_func(pconf, glabel)
         con_loss = self.hard_negative_mining(closs, mask, num_pos)
 
         # avoid no object detected

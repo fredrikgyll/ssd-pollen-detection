@@ -18,6 +18,8 @@ def point_form(boxes: Tensor):
     :return: Converted xmin, ymin, xmax, ymax form of boxes.
     :rtype: class:`torch.Tensor`
     """
+    assert boxes.size(1) == 4
+
     return torch.cat(
         (
             boxes[:, :2] - boxes[:, 2:] / 2,
@@ -35,6 +37,8 @@ def center_size(boxes: Tensor) -> Tensor:
     :return: Converted (cx, cy, w, h) form of boxes.
     :rtype: class:`torch.Tensor`
     """
+    assert boxes.size(1) == 4
+
     return torch.cat(
         (
             (boxes[:, 2:] + boxes[:, :2]) / 2,
@@ -57,6 +61,9 @@ def intersect(boxes_a: Tensor, boxes_b: Tensor) -> Tensor:
         is intersecion[0,1] of boxes_a[i] and boxes_b[j]
     :rtype: Tensor[boxes_a.size, boxes_b.size]
     """
+    assert boxes_a.size(1) == 4
+    assert boxes_b.size(1) == 4
+
     A = boxes_a.size(0)
     B = boxes_b.size(0)
     max_xy = torch.min(
@@ -79,6 +86,9 @@ def jaccard(boxes_a: Tensor, boxes_b: Tensor) -> Tensor:
         Tensor[boxes_a.size, boxes_b.size] where
         element (i,j) is IoU of boxes_a[i] and boxes_b[j]
     """
+    assert boxes_a.size(1) == 4
+    assert boxes_b.size(1) == 4
+
     inter = intersect(boxes_a, boxes_b)
     # Area is (x_max - x_min) * (y_max - y_min)
     # unsqueze so we can combine them with intersection.
@@ -101,6 +111,9 @@ def jaccard(boxes_a: Tensor, boxes_b: Tensor) -> Tensor:
 def match(
     defaults: Tensor, truths: Tensor, labels: Tensor, threshhold: float = 0.5
 ) -> Tensor:
+    assert defaults.size() == torch.Size([8732, 4])
+    assert truths.size(0) == labels.size(0)
+
     overlap = jaccard(point_form(defaults), truths)
     # best_default, best_defailt_idx = torch.max(overlap, 0, keepdim=True)
     # matches = overlap.ge(best_default) | overlap.ge(threshhold)

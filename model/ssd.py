@@ -58,7 +58,7 @@ class SSD(nn.Module):
                 x = layer(x)
                 if idx in layer_points:
                     source_layers.append(x)
-                    print(f'layer {feat_layer}: {x.size(2)}')
+                    # print(f'layer {feat_layer}: {x.size(2)}')
                     feat_layer += 1
 
         loc: List[Tensor] = []
@@ -71,10 +71,10 @@ class SSD(nn.Module):
         loc_tensor: Tensor = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
         conf_tensor: Tensor = torch.cat([o.view(o.size(0), -1) for o in conf], 1)
 
+        # TODO This shound maybe be view(Nbatch, 4, -1)
         return (
             loc_tensor.view(loc_tensor.size(0), -1, 4),
-            conf_tensor.view(conf_tensor.size(0), -1, self.num_classes),
-            self.priors,
+            conf_tensor.view(conf_tensor.size(0), self.num_classes, -1),
         )
 
 
