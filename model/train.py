@@ -10,7 +10,7 @@ from torchvision import datasets
 
 from ssd import make_ssd
 from loss import MultiBoxLoss
-from utils import match
+from utils import encode
 
 
 def collate(batch):
@@ -31,7 +31,7 @@ def collate(batch):
 def train():
     batch_size = 8
 
-    dataset = torchvision.datasets.FakeData(1000, (3, 300, 300), 2)
+    dataset = datasets.FakeData(1000, (3, 300, 300), 2)
     ssd_net = make_ssd(300, 2)
     optimizer = SGD(ssd_net.parameters(), lr=1e-3, momentum=1e-5)
     criterion = MultiBoxLoss(ssd_net.priors, batch_size)
@@ -47,7 +47,7 @@ def train():
         target_boxes = []
         target_labels = []
         for truth, label in zip(targets, labels):
-            target_box, target_label = match(ssd_net.priors, truth, label)
+            target_box, target_label = encode(ssd_net.priors, truth, label)
             target_boxes.append(target_box)
             target_labels.append(target_label)
         gloc = torch.stack(target_boxes, dim=0)

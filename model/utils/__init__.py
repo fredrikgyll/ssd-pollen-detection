@@ -1,1 +1,1 @@
-from .geometry import jaccard, intersect, match, point_form, center_size
+from .geometry import jaccard, intersect, encode, point_form, center_size, decode
