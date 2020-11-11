@@ -8,10 +8,12 @@ from utils import point_form
 class MultiBoxLoss(nn.Module):
     def __init__(self, dboxes: Tensor, batch_size: int) -> None:
         super(MultiBoxLoss, self).__init__()
-        self.dboxes = point_form(dboxes).expand(batch_size, -1, -1)
+        self.dboxes = nn.Parameter(
+            point_form(dboxes).expand(batch_size, -1, -1), requires_grad=False
+        )
         self.batch_size = batch_size
-        self.loc_loss_func = nn.SmoothL1Loss(reduce=False)
-        self.conf_loss_func = nn.CrossEntropyLoss(reduce=False)
+        self.loc_loss_func = nn.SmoothL1Loss(reduction='none')
+        self.conf_loss_func = nn.CrossEntropyLoss(reduction='none')
 
     def _to_offsets(self, gloc):
         assert gloc.size() == torch.Size([self.batch_size, 8732, 4])

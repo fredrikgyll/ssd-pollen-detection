@@ -23,8 +23,8 @@ def point_form(boxes: Tensor):
 
     return torch.cat(
         (
-            boxes[:, :2] - boxes[:, 2:] / 2,
-            boxes[:, :2] + boxes[:, 2:] / 2,
+            boxes[:, :2] - boxes[:, 2:] / 2.0,
+            boxes[:, :2] + boxes[:, 2:] / 2.0,
         ),
         dim=1,
     )
@@ -42,7 +42,7 @@ def center_size(boxes: Tensor) -> Tensor:
 
     return torch.cat(
         (
-            (boxes[:, 2:] + boxes[:, :2]) / 2,
+            (boxes[:, 2:] + boxes[:, :2]) / 2.0,
             boxes[:, 2:] - boxes[:, :2],
         ),
         dim=1,
@@ -172,8 +172,8 @@ def rescale_batch(
 
     ploc = torch.cat(
         (
-            ploc[:, :, :2] - ploc[:, :, 2:] / 2,
-            ploc[:, :, :2] + ploc[:, :, 2:] / 2,
+            ploc[:, :, :2] - ploc[:, :, 2:] / 2.0,
+            ploc[:, :, :2] + ploc[:, :, 2:] / 2.0,
         ),
         dim=2,
     )

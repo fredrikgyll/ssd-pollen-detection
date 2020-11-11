@@ -1,5 +1,6 @@
 from random import randint
 import time
+import argparse
 
 import torch
 import torchvision
@@ -11,6 +12,13 @@ from torchvision import datasets
 from ssd import make_ssd
 from loss import MultiBoxLoss
 from utils import encode
+
+parser = argparse.ArgumentParser(description='Train SSD300 model')
+parser.add_argument(
+    '--cuda',
+    action='store_true',
+    help='Train model on cuda enabled GPU',
+)
 
 
 def collate(batch):
@@ -28,13 +36,16 @@ def collate(batch):
     return torch.stack(images, dim=0), targets, labels
 
 
-def train():
+def train(args):
     batch_size = 8
 
     dataset = datasets.FakeData(1000, (3, 300, 300), 2)
     ssd_net = make_ssd(300, 2)
     optimizer = SGD(ssd_net.parameters(), lr=1e-3, momentum=1e-5)
     criterion = MultiBoxLoss(ssd_net.priors, batch_size)
+    if args.cuda:
+        ssd_net = ssd_net.cuda()
+        criterion = criterion.cuda()
     data_loader = data.DataLoader(dataset, batch_size=batch_size, collate_fn=collate)
 
     ssd_net.train()
@@ -53,6 +64,9 @@ def train():
         gloc = torch.stack(target_boxes, dim=0)
         glabel = torch.stack(target_labels, dim=0).long()
 
+        if args.cuda:
+            gloc, glabel, images = gloc.cuda(), glabel.cuda(), images.cuda()
+
         t0 = time.time()
         ploc, pconf = ssd_net(images)
         t1 = time.time()
@@ -70,5 +84,5 @@ def train():
 
 
 if __name__ == "__main__":
-    torch.set_default_tensor_type('torch.FloatTensor')
-    train()
+    args = parser.parse_args()
+    train(args)

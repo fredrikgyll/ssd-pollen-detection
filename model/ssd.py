@@ -58,7 +58,7 @@ class SSD(nn.Module):
                 x = layer(x)
                 if idx in layer_points:
                     source_layers.append(x)
-                    print(f'layer {feat_layer}: {x.size(2)}')
+                    # print(f'layer {feat_layer}: {x.size(2)}')
                     feat_layer += 1
 
         loc: List[Tensor] = []
