@@ -42,7 +42,7 @@ class MultiBoxLoss(nn.Module):
     def forward(
         self, ploc: Tensor, pconf: Tensor, gloc: Tensor, glabel: Tensor
     ) -> Tensor:
-
+        ploc = ploc.transpose(1, 2)
         assert ploc.size() == torch.Size([self.batch_size, 8732, 4])
         assert gloc.size() == torch.Size([self.batch_size, 8732, 4])
         assert glabel.size() == torch.Size([self.batch_size, 8732])

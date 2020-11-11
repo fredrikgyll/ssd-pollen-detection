@@ -58,24 +58,21 @@ class SSD(nn.Module):
                 x = layer(x)
                 if idx in layer_points:
                     source_layers.append(x)
-                    # print(f'layer {feat_layer}: {x.size(2)}')
+                    print(f'layer {feat_layer}: {x.size(2)}')
                     feat_layer += 1
 
         loc: List[Tensor] = []
         conf: List[Tensor] = []
         for x, l, c in zip(source_layers, self.loc_head, self.conf_head):
             # dims: batch, row, col, class/offset per aspect
-            loc.append(l(x).permute(0, 2, 3, 1).contiguous())
-            conf.append(c(x).permute(0, 2, 3, 1).contiguous())
+            # loc.append(l(x).permute(0, 2, 3, 1).contiguous())
+            # conf.append(c(x).permute(0, 2, 3, 1).contiguous())
+            loc.append(l(x).view(x.size(0), 4, -1))
+            conf.append(c(x).view(x.size(0), self.num_classes, -1))
         # dims: batch, offsets/class scale-row-col-aspect
-        loc_tensor: Tensor = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
-        conf_tensor: Tensor = torch.cat([o.view(o.size(0), -1) for o in conf], 1)
-
-        # TODO This shound maybe be view(Nbatch, 4, -1)
-        return (
-            loc_tensor.view(loc_tensor.size(0), -1, 4),
-            conf_tensor.view(conf_tensor.size(0), self.num_classes, -1),
-        )
+        loc_tensor: Tensor = torch.cat(loc, 2)
+        conf_tensor: Tensor = torch.cat(conf, 2)
+        return loc_tensor, conf_tensor
 
 
 def vgg(cfg: LayerSpec, input_channels: int) -> Modules:
