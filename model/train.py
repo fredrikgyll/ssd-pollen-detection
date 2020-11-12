@@ -129,7 +129,8 @@ def train(args):
                 print(f'Loss it({bidx}): {loss.item():4.2f}')
 
         elapsed = int(time.time() - t1)
-        print(f"Mean Loss:\t{np.mean(epoch_loss):4.2f}")
+        print(epoch_loss)
+        # print(f"Mean Loss:\t{np.mean(epoch_loss):4.2f}")
         print(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
         loss_hist.extend(epoch_loss)
         torch.save(ssd_net.state_dict(), save_dir / f'ssd_epoch_{i:02d}.pth')
