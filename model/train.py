@@ -61,7 +61,7 @@ def weights_init(m):
 
 
 def train(args):
-    run_id = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    run_id = datetime.datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
     save_dir = args.save / run_id
     save_dir.mkdir()
     batch_size = 8
