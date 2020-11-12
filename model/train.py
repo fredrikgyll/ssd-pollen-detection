@@ -129,13 +129,14 @@ def train(args):
 
         elapsed = int(time.time() - t1)
         loss_hist.extend(epoch_loss)
-        torch.save(ssd_net.state_dict(), save_dir / f'ssd_epoch_{i:02d}.pth')
+        if (i + 1) % 10 == 0:
+            torch.save(ssd_net.state_dict(), save_dir / f'ssd_epoch_{i:02d}.pth')
 
         print(f"Mean Loss:\t{np.mean(epoch_loss):4.2f}")
         print(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
-
     elapsed = int(time.time() - t0)
     loss_file = save_dir / 'loss_hist.pkl'
+    torch.save(ssd_net.state_dict(), save_dir / 'ssd_last.pth')
     pickle.dump(loss_hist, loss_file.open('wb'))
     print('====== FINISH ======')
     print(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
