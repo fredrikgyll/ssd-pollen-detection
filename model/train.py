@@ -1,17 +1,17 @@
 from random import randint
 import time
 import argparse
+from pathlib import Path
 
 import torch
-import torchvision
-from torchvision import transforms
 import torch.utils.data as data
 from torch.optim import SGD
-from torchvision import datasets
 
 from ssd import make_ssd
 from loss import MultiBoxLoss
-from utils import encode
+from utils.augmentations import get_transform
+from utils.geometry import encode
+from utils.data import Pollene1Dataset, collate
 
 parser = argparse.ArgumentParser(description='Train SSD300 model')
 parser.add_argument(
@@ -19,41 +19,60 @@ parser.add_argument(
     action='store_true',
     help='Train model on cuda enabled GPU',
 )
+parser.add_argument(
+    '--data',
+    type=Path,
+    help='path to data directory',
+)
+parser.add_argument(
+    '--weights',
+    type=Path,
+    help='Path th VGG16 weights',
+)
+parser.add_argument(
+    '--epochs',
+    type=int,
+    help='# of epochs to run',
+)
 
 
-def collate(batch):
-    images = []
-    targets = []
-    labels = []
-    to_tensor = transforms.ToTensor()
-    for im, t in batch:
-        num_targets = randint(1, 3)
-        t_min_xy = torch.randint(130, 140, (num_targets, 2))
-        t_max_xy = torch.randint(160, 180, (num_targets, 2))
-        targets.append(torch.cat((t_min_xy, t_max_xy), dim=1))
-        labels.append(torch.ones(num_targets))
-        images.append(to_tensor(im))
-    return torch.stack(images, dim=0), targets, labels
+def weights_init(m):
+    if isinstance(m, torch.nn.Conv2d):
+        torch.nn.init.xavier_uniform_(m.weight.data)
+        m.bias.data.zero_()
 
 
 def train(args):
     batch_size = 8
 
-    dataset = datasets.FakeData(1000, (3, 300, 300), 2)
+    # Data
+    root = args.data
+    transforms = get_transform()
+    dataset = Pollene1Dataset(root, transforms)
+    data_loader = data.DataLoader(
+        dataset, batch_size=8, shuffle=True, num_workers=2, collate_fn=collate
+    )
+
+    # Model init
     ssd_net = make_ssd(300, 2)
-    optimizer = SGD(ssd_net.parameters(), lr=1e-3, momentum=1e-5)
+    optimizer = SGD(ssd_net.parameters(), lr=1e-3, momentum=1e-1)
     criterion = MultiBoxLoss(ssd_net.priors, batch_size)
     if args.cuda:
         ssd_net = ssd_net.cuda()
         criterion = criterion.cuda()
-    data_loader = data.DataLoader(dataset, batch_size=batch_size, collate_fn=collate)
+
+    # Weights
+    vgg_weights = torch.load(args.weights)
+    ssd_net.base.load_state_dict(vgg_weights)
+    ssd_net.extra.apply(weights_init)
+    ssd_net.loc_head.apply(weights_init)
+    ssd_net.conf_head.apply(weights_init)
 
     ssd_net.train()
 
     batch_iterator = iter(data_loader)
 
-    epochs = 3
-    for i in range(epochs):
+    for i in range(args.epochs):
         images, targets, labels = next(batch_iterator)
         target_boxes = []
         target_labels = []

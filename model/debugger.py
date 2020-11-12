@@ -1,4 +1,5 @@
 import torch
+from torchvision.transforms.functional import to_pil_image
 import numpy as np
 
 
@@ -36,6 +37,10 @@ def patch_boxes(boxes):
     return np.hstack((boxes[:, :2], boxes[:, 2:] - boxes[:, :2]))
 
 
+def to_plt_img(image):
+    return np.array(to_pil_image(image, mode='RGB'))
+
+
 def show_img(name):
     import pickle
     from pathlib import Path
@@ -47,44 +52,62 @@ def show_img(name):
     p = Path('/Users/fredrikg/Projects/pollendb1/data/train')
     trf = Path('/Users/fredrikg/Projects/pollendb1/data/annotations/train_labels.pkl')
     train_labels = pickle.load(trf.open('rb'))
-    sub = aug.SubSample(640, 512)
-    distort = aug.TransformerSequence(
-        aug.HorizontalFlip(),
-        aug.ChannelSuffle(),
-    )
-    pre = aug.TransformerSequence(
-        aug.FromIntToFloat(),
-        aug.SubtractMean(),
+    flip = aug.VerticalFlip(1.1)
+    shuffle = aug.ColorSift(1.1)
+    std_transform = aug.TransformerSequence(
         aug.ToStandardForm(),
+        aug.SubSample(640, 512),
+        aug.SubtractMean(),
     )
-
     boxes = train_labels[name]
-    labels = np.ones(len(boxes))
-    im = np.array(Image.open(p / name))
+    labels = torch.ones(len(boxes))
+    im = Image.open(p / name)
 
-    tim, boxes, labels = pre(im, boxes, labels)
-    subim, subboxes, sublabels = sub(tim / 255, boxes, labels)
-    fim, fboxes, _ = distort(subim, subboxes, sublabels)
-    print(subboxes, fboxes)
-    subim = subim.transpose(1, 2, 0)
-    fim = fim.transpose(1, 2, 0)
-    subboxes = np.clip(patch_boxes(subboxes), 0, 1) * 300
-    fboxes = np.clip(patch_boxes(fboxes), 0, 1) * 300
+    im, boxes, labels = std_transform(im, boxes, labels)
+    fim, fboxes, flabels = flip(im, boxes, labels)
+    shuffim, shuffboxes, _ = shuffle(fim, fboxes, flabels)
+    print(im[0, :10, :10])
+    dim = 300
+    boxes = np.clip(patch_boxes(boxes) * dim, 0, dim)
+    fboxes = np.clip(patch_boxes(fboxes) * dim, 0, dim)
     fig, (ax1, ax2, ax3) = plt.subplots(nrows=1, ncols=3)
-    ax1.imshow(im, interpolation='none')
-    ax1.set_title('Original')
-    for *xy, w, h in patch_boxes(boxes):
+
+    ax1.imshow(to_plt_img(im), interpolation='none')
+    ax1.set_title('Subsample')
+    for *xy, w, h in boxes:
         ax1.add_patch(patches.Rectangle(xy, w, h, edgecolor='green', fill=False))
-    ax2.imshow(subim, interpolation='none')
-    ax2.set_title('Subsample')
-    for *xy, w, h in subboxes:
+
+    ax2.imshow(to_plt_img(fim), interpolation='none')
+    ax2.set_title('Flip')
+    for *xy, w, h in fboxes:
         ax2.add_patch(patches.Rectangle(xy, w, h, edgecolor='red', fill=False))
-    ax3.imshow(fim, interpolation='none')
+
+    ax3.imshow(to_plt_img(shuffim), interpolation='none')
     ax3.set_title('Channel Shuffle')
     for *xy, w, h in fboxes:
         ax3.add_patch(patches.Rectangle(xy, w, h, edgecolor='blue', fill=False))
     plt.show()
 
 
+def data_pipeline():
+    from utils.data import Pollene1Dataset, collate
+    from pathlib import Path
+    from utils.augmentations import get_transform
+
+    root = Path('/Users/fredrikg/Projects/pollendb1/data')
+    transforms = get_transform()
+    dataset = Pollene1Dataset(root, transforms)
+    dataloader = torch.utils.data.DataLoader(
+        dataset, batch_size=8, shuffle=True, num_workers=1, collate_fn=collate
+    )
+    dataiter = iter(dataloader)
+    image, bboxes, labels = next(dataiter)
+    print(image.shape)
+    print(bboxes.shape)
+    print(labels.shape)
+
+
 if __name__ == "__main__":
-    show_img('0090_108.jpg')
+    # show_img('0090_108.jpg')
+    # data_pipeline()
+    run_model()

@@ -1,6 +1,8 @@
 from typing import Any
-from matplotlib.pyplot import box
+import random
 
+import torch
+import torchvision.transforms.functional as f
 import numpy as np
 
 
@@ -16,25 +18,21 @@ class TransformerSequence:
 
 class ToStandardForm:
     def __call__(self, image, boxes, labels):
-        new_boxes = np.hstack((boxes[:, :2], boxes[:, 2:] + boxes[:, :2]))
-        return image.transpose(2, 0, 1), new_boxes, labels
-
-
-class FromIntToFloat:
-    def __call__(self, image, boxes, labels):
-        return image.astype(np.float32), boxes.astype(np.float32), labels
+        new_boxes = torch.cat(
+            (boxes[:, :2], boxes[:, 2:] + boxes[:, :2]), dim=1
+        ).float()
+        new_image = f.to_tensor(image)
+        return new_image, new_boxes, labels
 
 
 class SubtractMean:
-    VGG_MEAN = [123.68, 116.78, 103.94]
-
-    def __init__(self, means=[123.68, 116.78, 103.94]) -> None:
-        self.means = np.array(means)
+    MEAN = [0.485, 0.456, 0.406]
+    STD = std = [0.229, 0.224, 0.225]
 
     def __call__(self, image, boxes, labels):
-        new_image = image - self.means
-        # print(new_image[:5, :5, :])
-        return new_image, boxes, labels
+        for i, (mean, std) in enumerate(zip(self.MEAN, self.STD)):
+            image[i, ...] = (image[i, ...] - mean) / std
+        return image, boxes, labels
 
 
 class SubSample:
@@ -45,9 +43,8 @@ class SubSample:
 
     def __call__(self, image, boxes, labels) -> Any:
         # print(image.shape)
-        _, *dims = image.shape  # h, w
+        dims = torch.tensor(image.shape[1:])  # h, w
         out = self.out_dim
-        dims = np.array(dims)
 
         if dims[0] == out and dims[1] == out:
             return image, boxes, labels
@@ -56,12 +53,13 @@ class SubSample:
         attempts = 0
         while True:
             attempts += 1
-            h, w = (np.random.rand(2) * deltas).astype(int)
+            h, w = (torch.rand(2) * deltas).int()
             sub_img = image[..., h : h + out, w : w + out]
-            new_boxes = (boxes - [w, h, w, h]) / float(self.out_dim)
-            in_bound = (new_boxes[:, :2] > -0.1) & (new_boxes[:, 2:] < 1.1)
-            in_bound = in_bound.all(axis=1)
-            if in_bound.any():
+            box_offset = torch.tensor([w, h, w, h])
+            new_boxes = (boxes - box_offset) / float(self.out_dim)
+            in_bound = (new_boxes[:, :2] > -0.05) & (new_boxes[:, 2:] < 1.05)
+            in_bound = in_bound.all(dim=1)
+            if in_bound.any().item():
                 break
         # print(attempts)
         return sub_img, new_boxes[in_bound], labels[in_bound]
@@ -72,12 +70,27 @@ class HorizontalFlip:
         self.p = p
 
     def __call__(self, image, boxes, labels) -> Any:
-        random_val = np.random.random()
+        random_val = torch.rand(1).item()
         if random_val < self.p:
-            new_boxes = np.stack(
-                (1 - boxes[:, 0], boxes[:, 1], 1 - boxes[:, 2], boxes[:, 3]), axis=1
+            new_boxes = torch.stack(
+                (1 - boxes[:, 2], boxes[:, 1], 1 - boxes[:, 0], boxes[:, 3]), dim=1
             )
-            new_image = image[..., ::-1]
+            new_image = f.hflip(image)
+            return new_image, new_boxes, labels
+        return image, boxes, labels
+
+
+class VerticalFlip:
+    def __init__(self, p: float = 0.5) -> None:
+        self.p = p
+
+    def __call__(self, image, boxes, labels) -> Any:
+        random_val = torch.rand(1).item()
+        if random_val < self.p:
+            new_boxes = torch.stack(
+                (boxes[:, 0], 1 - boxes[:, 3], boxes[:, 2], 1 - boxes[:, 1]), dim=1
+            )
+            new_image = f.vflip(image)
             return new_image, new_boxes, labels
         return image, boxes, labels
 
@@ -87,9 +100,45 @@ class ChannelSuffle:
         self.p = p
 
     def __call__(self, image, boxes, labels) -> Any:
-        random_val = np.random.random()
+        random_val = torch.rand(1).item()
         if random_val < self.p:
-            channel_order = np.arange(0, image.shape[0])
-            np.random.shuffle(channel_order)
+            channel_order = torch.arange(0, image.size(0))
+            random.shuffle(channel_order)
             return image[channel_order, ...], boxes, labels
         return image, boxes, labels
+
+
+class ColorSift:
+    def __init__(self, p: float = 0.5) -> None:
+        self.p = p
+        self.transforms = [
+            f.adjust_brightness,
+            f.adjust_contrast,
+            f.adjust_saturation,
+        ]
+
+    def __call__(self, image, boxes, labels) -> Any:
+        random_val = torch.rand(1).item()
+        if random_val < self.p:
+            random.shuffle(self.transforms)
+            factors = np.random.uniform(0.5, 1.5, 3)
+            for t, fac in zip(self.transforms, factors):
+                image = t(image, fac)
+            return image, boxes, labels
+        return image, boxes, labels
+
+
+def get_transform(train: bool = True):
+    transforms = [
+        ToStandardForm(),
+        SubSample(640, 512),
+        SubtractMean(),
+    ]
+    if train:
+        transforms += [
+            VerticalFlip(),
+            HorizontalFlip(),
+            ColorSift(),
+            ChannelSuffle(),
+        ]
+    return TransformerSequence(*transforms)
