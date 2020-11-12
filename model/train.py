@@ -60,6 +60,7 @@ def train(args):
         shuffle=True,
         num_workers=args.workers,
         collate_fn=collate,
+        pin_memory=True,
     )
 
     # Model init
@@ -83,9 +84,7 @@ def train(args):
 
     for i in range(args.epochs):
         print(f'===== Iteration {i:2d} =====')
-        dt0 = time.time()
-        images, targets, labels = next(batch_iterator)
-        dt1 = time.time()
+        images, targets, labels = next(batch_iterator).data()
         target_boxes = []
         target_labels = []
         for truth, label in zip(targets, labels):
@@ -94,9 +93,7 @@ def train(args):
             target_labels.append(target_label)
         gloc = torch.stack(target_boxes, dim=0)
         glabel = torch.stack(target_labels, dim=0).long()
-        dt2 = time.time()
-        print(f"Batch load:\t{dt1-dt0:3.1f}")
-        print(f"Batch encode:\t{dt2-dt1:3.1f}")
+
         if args.cuda:
             gloc, glabel, images = gloc.cuda(), glabel.cuda(), images.cuda()
 
