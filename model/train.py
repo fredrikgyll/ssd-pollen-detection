@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torch.utils.data as data
 from torch.optim import SGD
+from torch.optim.lr_scheduler import MultiStepLR
 
 from ssd import make_ssd
 from loss import MultiBoxLoss
@@ -17,39 +18,35 @@ from utils.data import Pollene1Dataset, collate
 
 parser = argparse.ArgumentParser(description='Train SSD300 model')
 parser.add_argument(
-    '--cuda',
-    action='store_true',
-    help='Train model on cuda enabled GPU',
+    '--cuda', action='store_true', help='Train model on cuda enabled GPU'
+)
+parser.add_argument('--data', '-d', type=Path, help='path to data directory')
+parser.add_argument('--weights', '-w', type=Path, help='Path to VGG16 weights')
+parser.add_argument('--save', '-s', type=Path, help='Path to save folder')
+parser.add_argument('--epochs', '-e', type=int, help='# of epochs to run')
+parser.add_argument('--workers', default=2, type=int, help='# of workers in dataloader')
+parser.add_argument(
+    '--lr', '--learning-rate', default=1e-3, type=float, help='initial learning rate'
 )
 parser.add_argument(
-    '--data',
-    '-d',
-    type=Path,
-    help='path to data directory',
+    '--momentum', default=0.9, type=float, help='Momentum value for optim'
 )
 parser.add_argument(
-    '--weights',
-    '-w',
-    type=Path,
-    help='Path to VGG16 weights',
+    '--weight_decay', default=5e-4, type=float, help='Weight decay for SGD'
 )
 parser.add_argument(
-    '--save',
-    '-s',
-    type=Path,
-    help='Path to save folder',
-)
-parser.add_argument(
-    '--epochs',
-    '-e',
+    '--batch-size',
+    '--bs',
     type=int,
-    help='# of epochs to run',
+    default=8,
+    help='number of examples for each iteration',
 )
 parser.add_argument(
-    '--workers',
+    '--multistep',
+    nargs='*',
     type=int,
-    help='# of workers in dataloader',
-    default=2,
+    default=[40, 55],
+    help='epochs at which to decay learning rate',
 )
 
 
@@ -63,7 +60,7 @@ def train(args):
     run_id = datetime.datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
     save_dir = args.save / run_id
     save_dir.mkdir()
-    batch_size = 8
+    batch_size = args.batch_size
 
     # Data
     root = args.data
@@ -72,7 +69,7 @@ def train(args):
     print(f'Iterations in dataset {len(dataset)//batch_size}')
     data_loader = data.DataLoader(
         dataset,
-        batch_size=8,
+        batch_size=batch_size,
         shuffle=True,
         num_workers=args.workers,
         collate_fn=collate,
@@ -81,7 +78,14 @@ def train(args):
 
     # Model init
     ssd_net = make_ssd(300, 2)
-    optimizer = SGD(ssd_net.parameters(), lr=1e-3, momentum=1e-1)
+    optimizer = SGD(
+        ssd_net.parameters(),
+        lr=args.lr,
+        momentum=args.momentum,
+        weight_decay=args.weight_decay,
+    )
+    scheduler = MultiStepLR(optimizer=optimizer, milestones=args.multistep, gamma=0.1)
+
     criterion = MultiBoxLoss(ssd_net.priors, batch_size)
     if args.cuda:
         ssd_net = ssd_net.cuda()
@@ -123,6 +127,7 @@ def train(args):
             loss = criterion(ploc, pconf, gloc, glabel)
             loss.backward()
             optimizer.step()
+            scheduler.step()
             epoch_loss.append(loss.item())
             if bidx % 10 == 0:
                 print(f'Loss Iter. {bidx:02d}: {loss.item():6.3f}')
