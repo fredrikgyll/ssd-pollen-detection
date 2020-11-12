@@ -15,6 +15,7 @@ from loss import MultiBoxLoss
 from utils.augmentations import get_transform
 from utils.geometry import encode
 from utils.data import Pollene1Dataset, collate
+from utils.logger import Logger
 
 parser = argparse.ArgumentParser(description='Train SSD300 model')
 parser.add_argument(
@@ -59,6 +60,7 @@ def weights_init(m):
 def train(args):
     run_id = datetime.datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
     save_dir = args.save / run_id
+    logger = Logger(save_dir)
     save_dir.mkdir()
     batch_size = args.batch_size
 
@@ -66,7 +68,7 @@ def train(args):
     root = args.data
     transforms = get_transform()
     dataset = Pollene1Dataset(root, transforms)
-    print(f'Iterations in dataset {len(dataset)//batch_size}')
+    logger(f'Iterations in dataset {len(dataset)//batch_size}')
     data_loader = data.DataLoader(
         dataset,
         batch_size=batch_size,
@@ -104,7 +106,7 @@ def train(args):
 
     t0 = time.time()
     for i in range(args.epochs):
-        print(f'===== Epoch {i:2d} =====')
+        logger(f'===== Epoch {i:2d} =====')
         epoch_loss = []
         t1 = time.time()
         for bidx, batch in enumerate(data_loader):
@@ -130,21 +132,21 @@ def train(args):
             scheduler.step()
             epoch_loss.append(loss.item())
             if bidx % 10 == 0:
-                print(f'Loss Iter. {bidx:02d}: {loss.item():6.3f}')
+                logger(f'Loss Iter. {bidx:02d}: {loss.item():6.3f}')
 
         elapsed = int(time.time() - t1)
         loss_hist.extend(epoch_loss)
         if (i + 1) % 10 == 0:
             torch.save(ssd_net.state_dict(), save_dir / f'ssd_epoch_{i:02d}.pth')
 
-        print(f"Mean Loss:\t{np.mean(epoch_loss):4.2f}")
-        print(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
+        logger(f"Mean Loss:\t{np.mean(epoch_loss):4.2f}")
+        logger(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
     elapsed = int(time.time() - t0)
     loss_file = save_dir / 'loss_hist.pkl'
     torch.save(ssd_net.state_dict(), save_dir / 'ssd_last.pth')
     pickle.dump(loss_hist, loss_file.open('wb'))
-    print('====== FINISH ======')
-    print(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
+    logger('====== FINISH ======')
+    logger(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
 
 
 if __name__ == "__main__":
