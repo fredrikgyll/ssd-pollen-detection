@@ -16,7 +16,7 @@ class MultiBoxLoss(nn.Module):
         self.conf_loss_func = nn.CrossEntropyLoss(reduction='none')
 
     def _to_offsets(self, gloc):
-        assert gloc.size() == torch.Size([self.batch_size, 4, 8732])
+        # assert gloc.size() == torch.Size([self.batch_size, 4, 8732])
 
         dxy = self.dboxes[:, :2, :]
         dwh = self.dboxes[:, 2:, :]
@@ -44,11 +44,11 @@ class MultiBoxLoss(nn.Module):
     def forward(
         self, ploc: Tensor, pconf: Tensor, gloc: Tensor, glabel: Tensor
     ) -> Tensor:
-        assert ploc.size() == torch.Size([self.batch_size, 4, 8732])
-        assert gloc.size() == torch.Size([self.batch_size, 4, 8732])
-        assert glabel.size() == torch.Size([self.batch_size, 8732])
-        assert pconf.size() == torch.Size([self.batch_size, 2, 8732])
-        assert ploc.size() == gloc.size()
+        # assert ploc.size() == torch.Size([self.batch_size, 4, 8732])
+        # assert gloc.size() == torch.Size([self.batch_size, 4, 8732])
+        # assert glabel.size() == torch.Size([self.batch_size, 8732])
+        # assert pconf.size() == torch.Size([self.batch_size, 2, 8732])
+        # assert ploc.size() == gloc.size()
 
         mask = glabel > 0
         num_pos = mask.sum(dim=1)
