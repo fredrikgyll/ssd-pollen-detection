@@ -34,6 +34,11 @@ parser.add_argument(
     type=int,
     help='# of epochs to run',
 )
+parser.add_argument(
+    '--workers',
+    type=int,
+    help='# of workers in dataloader',
+)
 
 
 def weights_init(m):
@@ -50,7 +55,11 @@ def train(args):
     transforms = get_transform()
     dataset = Pollene1Dataset(root, transforms)
     data_loader = data.DataLoader(
-        dataset, batch_size=8, shuffle=True, num_workers=2, collate_fn=collate
+        dataset,
+        batch_size=8,
+        shuffle=True,
+        num_workers=args.workers,
+        collate_fn=collate,
     )
 
     # Model init
@@ -73,7 +82,10 @@ def train(args):
     batch_iterator = iter(data_loader)
 
     for i in range(args.epochs):
+        print(f'===== Iteration {i:2d} =====')
+        dt0 = time.time()
         images, targets, labels = next(batch_iterator)
+        dt1 = time.time()
         target_boxes = []
         target_labels = []
         for truth, label in zip(targets, labels):
@@ -82,7 +94,9 @@ def train(args):
             target_labels.append(target_label)
         gloc = torch.stack(target_boxes, dim=0)
         glabel = torch.stack(target_labels, dim=0).long()
-
+        dt2 = time.time()
+        print(f"Batch load:\t{dt1-dt0:3.1f}")
+        print(f"Batch encode:\t{dt2-dt1:3.1f}")
         if args.cuda:
             gloc, glabel, images = gloc.cuda(), glabel.cuda(), images.cuda()
 
@@ -95,8 +109,7 @@ def train(args):
         loss.backward()
         optimizer.step()
         t2 = time.time()
-        print(f'===== Iteration {i:2d} =====')
-        print(f"Loss:\t{float(loss):3.1f}")
+        print(f"Loss:\t{loss.item():3.1f}")
         print(f"Forward:\t{t1-t0:3.1f} sec")
         print(f"Backward:\t{t2-t1:3.1f} sec")
         print(f"Total:\t\t{t2-t0:3.1f} sec")
