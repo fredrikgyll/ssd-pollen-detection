@@ -154,9 +154,10 @@ def encode(
     labels_out = torch.zeros(defaults.size(0)).int()
     boxes_out = torch.zeros(defaults.size()).float()
     pos_mask = matched_targets.ge(0)
+    # print(f'positive boxes: {pos_mask.sum()}')
     labels_out[pos_mask] = labels[matched_targets[pos_mask]].int()
     boxes_out[pos_mask] = center_size(truths[matched_targets[pos_mask]])
-    return boxes_out, labels_out
+    return boxes_out.transpose(0, 1), labels_out
 
 
 def rescale_batch(

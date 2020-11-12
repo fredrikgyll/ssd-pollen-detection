@@ -9,22 +9,22 @@ class MultiBoxLoss(nn.Module):
     def __init__(self, dboxes: Tensor, batch_size: int) -> None:
         super(MultiBoxLoss, self).__init__()
         self.dboxes = nn.Parameter(
-            point_form(dboxes).expand(batch_size, -1, -1), requires_grad=False
+            point_form(dboxes).transpose(0, 1).unsqueeze(dim=0), requires_grad=False
         )
         self.batch_size = batch_size
         self.loc_loss_func = nn.SmoothL1Loss(reduction='none')
         self.conf_loss_func = nn.CrossEntropyLoss(reduction='none')
 
     def _to_offsets(self, gloc):
-        assert gloc.size() == torch.Size([self.batch_size, 8732, 4])
+        assert gloc.size() == torch.Size([self.batch_size, 4, 8732])
 
-        dxy = self.dboxes[:, :, :2]
-        dwh = self.dboxes[:, :, 2:]
-        gxy = gloc[:, :, :2]
-        gwh = gloc[:, :, 2:]
+        dxy = self.dboxes[:, :2, :]
+        dwh = self.dboxes[:, 2:, :]
+        gxy = gloc[:, :2, :]
+        gwh = gloc[:, 2:, :]
         gxy = (gxy - dxy) / dwh
         gwh = (gwh / dwh).log()
-        return torch.cat((gxy, gwh), dim=2).contiguous()
+        return torch.cat((gxy, gwh), dim=1).contiguous()
 
     def hard_negative_mining(self, loss, mask, pos_num):
         # postive mask will never selected
@@ -44,9 +44,8 @@ class MultiBoxLoss(nn.Module):
     def forward(
         self, ploc: Tensor, pconf: Tensor, gloc: Tensor, glabel: Tensor
     ) -> Tensor:
-        ploc = ploc.transpose(1, 2)
-        assert ploc.size() == torch.Size([self.batch_size, 8732, 4])
-        assert gloc.size() == torch.Size([self.batch_size, 8732, 4])
+        assert ploc.size() == torch.Size([self.batch_size, 4, 8732])
+        assert gloc.size() == torch.Size([self.batch_size, 4, 8732])
         assert glabel.size() == torch.Size([self.batch_size, 8732])
         assert pconf.size() == torch.Size([self.batch_size, 2, 8732])
         assert ploc.size() == gloc.size()
@@ -56,8 +55,9 @@ class MultiBoxLoss(nn.Module):
 
         gloc_offset = self._to_offsets(gloc)
         loc_loss = self.loc_loss_func(ploc, gloc_offset)
-        loc_loss = loc_loss.sum(dim=2)
-        loc_loss = (mask * loc_loss).sum(dim=1)
+        loc_loss = loc_loss.sum(dim=1)
+        loc_loss = mask.float() * loc_loss
+        loc_loss = torch.nansum(loc_loss, dim=1)
 
         closs = self.conf_loss_func(pconf, glabel)
         con_loss = self.hard_negative_mining(closs, mask, num_pos)

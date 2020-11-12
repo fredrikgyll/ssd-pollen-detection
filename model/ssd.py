@@ -91,6 +91,7 @@ def vgg(cfg: LayerSpec, input_channels: int) -> Modules:
             ]
             in_channels = key
     layers += [
+        nn.MaxPool2d(kernel_size=3, stride=1, padding=1),
         nn.Conv2d(512, 1024, kernel_size=3, stride=1, padding=1),  # conv6
         nn.ReLU(inplace=True),
         nn.Conv2d(1024, 1024, kernel_size=1, stride=1, padding=0),  # conv7
@@ -163,7 +164,7 @@ def make_ssd(size: int = 300, num_classes: int = 2) -> SSD:
     if size == 300:
         cfg.update(
             extra=[*(256, 'S', 512), *(128, 'S', 256), *(128, 256), *(128, 256)],
-            source_idx=[[21, 32], [1, 3, 5, 7]],
+            source_idx=[[21, 33], [1, 3, 5, 7]],
             feature_maps=[38, 19, 10, 5, 3, 1],
             default_boxes=[
                 [4, 6],
