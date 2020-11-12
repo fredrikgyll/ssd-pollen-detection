@@ -1,10 +1,9 @@
 import pickle
-from random import randint
 import time
 import argparse
 from pathlib import Path
-from statistics import mean
 import datetime
+import numpy as np
 
 import torch
 import torch.utils.data as data
@@ -130,7 +129,7 @@ def train(args):
                 print(f'Loss it({bidx}): {loss.item():4.2f}')
 
         elapsed = int(time.time() - t1)
-        print(f"Mean Loss:\t{mean(epoch_loss):4.2f}")
+        print(f"Mean Loss:\t{np.mean(epoch_loss):4.2f}")
         print(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
         loss_hist.extend(epoch_loss)
         torch.save(ssd_net.state_dict(), save_dir / f'ssd_epoch_{i:02d}.pth')
