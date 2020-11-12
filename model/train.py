@@ -96,7 +96,6 @@ def train(args):
 
     ssd_net.train()
 
-    batch_iterator = iter(data_loader)
     loss_hist = []
 
     t0 = time.time()
@@ -104,7 +103,7 @@ def train(args):
         print(f'===== Epoch {i:2d} =====')
         epoch_loss = []
         t1 = time.time()
-        for bidx, batch in enumerate(batch_iterator):
+        for bidx, batch in enumerate(data_loader):
             images, targets, labels = batch.data()
             target_boxes = []
             target_labels = []
@@ -126,14 +125,14 @@ def train(args):
             optimizer.step()
             epoch_loss.append(loss.item())
             if bidx % 10 == 0:
-                print(f'Loss it({bidx}): {loss.item():4.2f}')
+                print(f'Loss Iter. {bidx:02d}: {loss.item():6.3f}')
 
         elapsed = int(time.time() - t1)
-        print(epoch_loss)
-        # print(f"Mean Loss:\t{np.mean(epoch_loss):4.2f}")
-        print(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
         loss_hist.extend(epoch_loss)
         torch.save(ssd_net.state_dict(), save_dir / f'ssd_epoch_{i:02d}.pth')
+
+        print(f"Mean Loss:\t{np.mean(epoch_loss):4.2f}")
+        print(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
 
     elapsed = int(time.time() - t0)
     loss_file = save_dir / 'loss_hist.pkl'
