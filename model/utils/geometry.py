@@ -169,7 +169,7 @@ def rescale_batch(
     # ploc has offsets relative to the default boxcoordinates so must be transformed
     # to actual bounding boxes
     ploc[:, :, :2] = ploc[:, :, :2] * defaults[:, 2:] + defaults[:, :2]
-    ploc[:, :, 2:] = ploc[:, :, 2:].exp() * ploc[:, :, 2:]
+    ploc[:, :, 2:] = ploc[:, :, 2:].exp() * defaults[:, 2:]
 
     ploc = torch.cat(
         (
@@ -185,7 +185,7 @@ def rescale_batch(
 def nms(
     bbox: Tensor, prob: Tensor, soft: bool, iou_thr: float, score_thr: float
 ) -> Tensor:
-    max_num = 100
+    max_num = 25
     out_boxes = []
     out_labels = []
     out_confs = []
@@ -244,12 +244,14 @@ def decode(
     score_thr: float = 0.05,
 ) -> Tensor:
     """Transform the model output into bounding boxes and perform NMS on each image"""
-    with torch.no_grad():
-        bboxes, probs = rescale_batch(defaults, ploc, pconf)
 
-        output_boxes = []
-        for bbox, prob in zip(bboxes.split(1, dim=0), probs.split(1, dim=0)):
-            bbox = bbox.squeeze(0)
-            prob = prob.squeeze(0)
-            output_boxes.append(nms(bbox, prob, soft, iou_thr, score_thr))
-        return output_boxes
+    bboxes, probs = rescale_batch(defaults, ploc, pconf)
+
+    output_boxes = []
+    for bbox, prob in zip(bboxes.split(1, dim=0), probs.split(1, dim=0)):
+        bbox = bbox.squeeze(0)
+        prob = prob.squeeze(0)
+        output_boxes.append(
+            nms(bbox, prob, soft, iou_thr, score_thr)[0]
+        )  # TODO get labels and conf
+    return torch.cat(output_boxes, 0)

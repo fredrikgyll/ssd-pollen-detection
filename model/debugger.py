@@ -1,6 +1,11 @@
+import io
 import torch
+from torchvision import transforms
 from torchvision.transforms.functional import to_pil_image
 import numpy as np
+from pathlib import Path
+from PIL import Image
+import pickle
 
 
 def run_model():
@@ -14,10 +19,6 @@ def run_model():
 
 
 def run_subsampler(name):
-    from PIL import Image
-    from pathlib import Path
-    import pickle
-    import numpy as np
     from utils.augmentations import SubSample
 
     root = Path('/Users/fredrikg/Projects/pollendb1/data')
@@ -42,9 +43,6 @@ def to_plt_img(image):
 
 
 def show_img(name):
-    import pickle
-    from pathlib import Path
-    from PIL import Image
     import matplotlib.pyplot as plt
     import matplotlib.patches as patches
     import utils.augmentations as aug
@@ -91,12 +89,11 @@ def show_img(name):
 
 def data_pipeline():
     from utils.data import Pollene1Dataset, collate
-    from pathlib import Path
     from utils.augmentations import get_transform
 
     root = Path('/Users/fredrikg/Projects/pollendb1/data')
-    transforms = get_transform()
-    dataset = Pollene1Dataset(root, transforms)
+    transform = get_transform()
+    dataset = Pollene1Dataset(root, transform)
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=8, shuffle=True, num_workers=1, collate_fn=collate
     )
@@ -107,7 +104,54 @@ def data_pipeline():
     print(labels.shape)
 
 
+def infer(name):
+    from ssd import make_ssd
+    from utils.geometry import decode
+    from utils.augmentations import get_transform, DeNormalize
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as patches
+
+    dim = 300
+    model_ch = Path(
+        '/Users/fredrikg/Projects/pollendb1/saves/2020-11-12T17-43-58/ssd_epoch_19.pth'
+    )
+    model = make_ssd()
+    model_state = torch.load(model_ch, map_location=torch.device('cpu'))
+    model.load_state_dict(model_state)
+
+    p = Path('/Users/fredrikg/Projects/pollendb1/data/train')
+    trf = Path('/Users/fredrikg/Projects/pollendb1/data/annotations/train_bboxes.pkl')
+    train_labels = pickle.load(trf.open('rb'))
+    boxes = train_labels[name]
+    labels = torch.ones(len(boxes))
+    img = Image.open(p / name)
+
+    denorm = DeNormalize()
+    transform = get_transform(train=False)
+
+    img, boxes, labels = transform(img, boxes, labels)
+    img, _, _ = denorm(img, boxes, labels)
+    model.eval()
+    with torch.no_grad():
+        ploc, pconf = model(img.unsqueeze(0))
+        print('done out')
+        out_boxes = decode(model.priors, ploc, pconf, soft=False, iou_thr=0.3)
+
+    boxes = np.clip(patch_boxes(boxes.numpy()) * dim, 0, dim)
+    out_boxes = np.clip(patch_boxes(out_boxes.numpy()) * dim, 0, dim)
+
+    _, ax = plt.subplots()
+    ax.imshow(to_plt_img(img), interpolation='none')
+    ax.set_title('Subsample')
+    for *xy, w, h in boxes:
+        ax.add_patch(patches.Rectangle(xy, w, h, edgecolor='green', fill=False))
+    for *xy, w, h in out_boxes:
+        ax.add_patch(patches.Rectangle(xy, w, h, edgecolor='red', fill=False))
+    plt.show()
+
+
 if __name__ == "__main__":
     # show_img('0090_108.jpg')
     # data_pipeline()
-    run_model()
+    # run_model()
+    infer('0090_108.jpg')

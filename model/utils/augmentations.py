@@ -25,13 +25,23 @@ class ToStandardForm:
         return new_image, new_boxes, labels
 
 
-class SubtractMean:
+class Normalize:
     MEAN = [0.485, 0.456, 0.406]
     STD = std = [0.229, 0.224, 0.225]
 
     def __call__(self, image, boxes, labels):
         for i, (mean, std) in enumerate(zip(self.MEAN, self.STD)):
             image[i, ...] = (image[i, ...] - mean) / std
+        return image, boxes, labels
+
+
+class DeNormalize:
+    MEAN = [0.485, 0.456, 0.406]
+    STD = std = [0.229, 0.224, 0.225]
+
+    def __call__(self, image, boxes, labels):
+        for i, (mean, std) in enumerate(zip(self.MEAN, self.STD)):
+            image[i, ...] = (image[i, ...] * std) + mean
         return image, boxes, labels
 
 
@@ -132,7 +142,7 @@ def get_transform(train: bool = True):
     transforms = [
         ToStandardForm(),
         SubSample(640, 512),
-        SubtractMean(),
+        Normalize(),
     ]
     if train:
         transforms += [
