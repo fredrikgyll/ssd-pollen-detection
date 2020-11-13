@@ -51,12 +51,6 @@ parser.add_argument(
 )
 
 
-def weights_init(m):
-    if isinstance(m, torch.nn.Conv2d):
-        torch.nn.init.xavier_uniform_(m.weight.data)
-        m.bias.data.zero_()
-
-
 def train(args):
     run_id = datetime.datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
     save_dir = args.save / run_id
@@ -80,9 +74,10 @@ def train(args):
 
     # Model init
     ssd_net = make_ssd(300, 2)
+    learning_rate = args.lr * (batch_size / 32)
     optimizer = SGD(
         ssd_net.parameters(),
-        lr=args.lr,
+        lr=learning_rate,
         momentum=args.momentum,
         weight_decay=args.weight_decay,
     )
@@ -96,9 +91,7 @@ def train(args):
     # Weights
     vgg_weights = torch.load(args.weights)
     ssd_net.base.load_state_dict(vgg_weights)
-    ssd_net.extra.apply(weights_init)
-    ssd_net.loc_head.apply(weights_init)
-    ssd_net.conf_head.apply(weights_init)
+    ssd_net._init_weights()
 
     ssd_net.train()
 
@@ -146,7 +139,7 @@ def train(args):
     torch.save(ssd_net.state_dict(), save_dir / 'ssd_last.pth')
     pickle.dump(loss_hist, loss_file.open('wb'))
     logger('====== FINISH ======')
-    logger(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
+    print(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
 
 
 if __name__ == "__main__":

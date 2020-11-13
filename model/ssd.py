@@ -1,15 +1,12 @@
-from typing import Tuple, Dict, Any, Union, List
+from typing import Tuple, Dict, Any, List
 
 import torch
 from torch import Tensor
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
 
 from priors import priors
 
 Modules = List[nn.Module]
-LayerSpec = List[Union[str, int]]
 
 
 class SSD(nn.Module):
@@ -50,16 +47,28 @@ class SSD(nn.Module):
         self.loc_head = nn.ModuleList(head[0])
         self.conf_head = nn.ModuleList(head[1])
 
+    def _init_weights(self):
+        layers = [*self.extra, *self.loc_head, *self.conf_head]
+        for layer in layers:
+            for param in layer.parameters():
+                if param.dim() > 1:
+                    nn.init.xavier_uniform_(param)
+
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         source_layers = []
-        feat_layer = 0
-        for layers, layer_points in zip((self.base, self.extra), self.source_idx):
-            for idx, layer in enumerate(layers):
-                x = layer(x)
-                if idx in layer_points:
-                    source_layers.append(x)
-                    # print(f'layer {feat_layer}: {x.size(2)}')
-                    feat_layer += 1
+        # feat_layer = 0
+        for idx, l in enumerate(self.base):
+            x = l(x)
+            if idx in self.source_idx:
+                source_layers.append(x)
+                # print(f'layer {feat_layer}: {x.size(2)}')
+                # feat_layer += 1
+
+        for l in self.extra:
+            x = l(x)
+            source_layers.append(x)
+            # print(f'layer {feat_layer}: {x.size(2)}')
+            # feat_layer += 1
 
         loc: List[Tensor] = []
         conf: List[Tensor] = []
@@ -70,15 +79,15 @@ class SSD(nn.Module):
             loc.append(l(x).view(x.size(0), 4, -1))
             conf.append(c(x).view(x.size(0), self.num_classes, -1))
         # dims: batch, offsets/class scale-row-col-aspect
-        loc_tensor: Tensor = torch.cat(loc, 2)
-        conf_tensor: Tensor = torch.cat(conf, 2)
+        loc_tensor: Tensor = torch.cat(loc, 2).contiguous()
+        conf_tensor: Tensor = torch.cat(conf, 2).contiguous()
         return loc_tensor, conf_tensor
 
 
-def vgg(cfg: LayerSpec, input_channels: int) -> Modules:
+def vgg(cfg: Dict[str, Any], input_channels: int) -> Modules:
     layers: Modules = []
     in_channels = input_channels
-    for key in cfg:
+    for key in cfg['vgg']:
         if isinstance(key, str):
             if key == 'M':
                 layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
@@ -100,52 +109,51 @@ def vgg(cfg: LayerSpec, input_channels: int) -> Modules:
     return layers
 
 
-def extra_layers(cfg: LayerSpec, input_channels: int) -> Modules:
+def extra_layers(cfg: Dict[str, Any]) -> Modules:
     # Extra layers for feature scaling
-    layers: Modules = []
-    in_channels = input_channels
-    kernel = 1
-    i = 0
-    layer_cfg: Dict[str, Any] = {}
-    while i < len(cfg):
-        if cfg[i] == 'S':
-            i += 1
-            layer_cfg.update(stride=2, padding=1)
-        else:
-            layer_cfg.update(stride=1, padding=0)
-        layer_cfg.update(
-            in_channels=in_channels, out_channels=cfg[i], kernel_size=kernel
-        )
-        layers += [nn.Conv2d(**layer_cfg)]
-
-        kernel = 4 - kernel
-        in_channels = cfg[i]
-        i += 1
-
-    return layers
-
-
-def multibox_layers(
-    cfg: Dict[str, Any], base: Modules, extra_layers: Modules
-) -> Modules:
-    _loc_layers = []
-    _conf_layers = []
-
-    for layers, layer_points, boxes in zip(
-        (base, extra_layers), cfg['source_idx'], cfg['default_boxes']
+    # [*(256, 'S', 512), *(128, 'S', 256), *(128, 256), *(128, 256)],
+    channels = [256, 128, 128, 128]
+    in_channels = cfg['out_channels'][1:]
+    layers = []
+    for i, (input_size, output_size, channels) in enumerate(
+        zip(in_channels[:-1], in_channels[1:], channels)
     ):
-        for idx, mbox in zip(layer_points, boxes):
-            _loc_layers.append(
-                nn.Conv2d(layers[idx].out_channels, 4 * mbox, kernel_size=3, padding=1)
-            )
-            _conf_layers.append(
+        if i < 2:
+            layer = nn.Sequential(
+                nn.Conv2d(input_size, channels, kernel_size=1, bias=False),
+                nn.BatchNorm2d(channels),
+                nn.ReLU(inplace=True),
                 nn.Conv2d(
-                    layers[idx].out_channels,
-                    cfg['num_classes'] * mbox,
+                    channels,
+                    output_size,
                     kernel_size=3,
                     padding=1,
-                )
+                    stride=2,
+                    bias=False,
+                ),
+                nn.BatchNorm2d(output_size),
+                nn.ReLU(inplace=True),
             )
+        else:
+            layer = nn.Sequential(
+                nn.Conv2d(input_size, channels, kernel_size=1, bias=False),
+                nn.BatchNorm2d(channels),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(channels, output_size, kernel_size=3, bias=False),
+                nn.BatchNorm2d(output_size),
+                nn.ReLU(inplace=True),
+            )
+        layers.append(layer)
+    return nn.ModuleList(layers)
+
+
+def multibox_layers(cfg: Dict[str, Any]) -> Modules:
+    _loc_layers = []
+    _conf_layers = []
+    nc = cfg['num_classes']
+    for oc, nd in zip(cfg['out_channels'], cfg['default_boxes']):
+        _loc_layers.append(nn.Conv2d(oc, 4 * nd, kernel_size=3, padding=1))
+        _conf_layers.append(nn.Conv2d(oc, nc * nd, kernel_size=3, padding=1))
     return _loc_layers, _conf_layers
 
 
@@ -163,38 +171,15 @@ def make_ssd(size: int = 300, num_classes: int = 2) -> SSD:
     }
     if size == 300:
         cfg.update(
-            extra=[*(256, 'S', 512), *(128, 'S', 256), *(128, 256), *(128, 256)],
-            source_idx=[[21, 33], [1, 3, 5, 7]],
+            out_channels=[512, 1024, 512, 256, 256, 256],
+            source_idx=[21, 33],
             feature_maps=[38, 19, 10, 5, 3, 1],
-            default_boxes=[
-                [4, 6],
-                [6, 6, 4, 4],
-            ],
+            default_boxes=[4, 6, 6, 6, 4, 4],
             s_min=0.2,
             s_max=0.9,
             aspect_ratios=[[2], [2, 3], [2, 3], [2, 3], [2], [2]],
         )
-    elif size == 512:
-        cfg.update(
-            extra=[
-                *(256, 'S', 512),
-                *(128, 'S', 256),
-                *(128, 'S', 256),
-                *(128, 256),
-                *(128, 'S', 256),
-            ],
-            source_idx=[[21, 32], [1, 3, 5, 7, 9]],
-            feature_maps=[64, 32, 16, 8, 4, 2, 1],
-            default_boxes=[
-                [4, 6],
-                [6, 6, 6, 4, 4],
-            ],
-            s_min=0.15,
-            s_max=0.9,
-            aspect_ratios=[[2], [2, 3], [2, 3], [2, 3], [2, 3], [2], [2]],
-        )
-
-    base = vgg(cfg['vgg'], input_channels=3)
-    extra = extra_layers(cfg['extra'], input_channels=1024)
-    head = multibox_layers(cfg, base, extra)
+    base = vgg(cfg, input_channels=3)
+    extra = extra_layers(cfg)
+    head = multibox_layers(cfg)
     return SSD(base, extra, head, cfg)

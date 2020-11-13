@@ -22,7 +22,7 @@ def priors(cfg: Dict[str, Any]) -> torch.Tensor:
     ratios = [[sqrt(a_r) for a_r in a] for a in cfg['aspect_ratios']]
     s_k = 0
     s_k_1 = s_min
-    for k, (f, a) in enumerate(zip(cfg['feature_maps'], ratios)):
+    for f, a in zip(cfg['feature_maps'], ratios):
         s_k = s_k_1
         s_k_1 += scale_factor
         s_k_prime = sqrt(s_k * s_k_1)
