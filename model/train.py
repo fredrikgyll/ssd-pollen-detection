@@ -73,11 +73,7 @@ def train(args):
     )
 
     # Model init
-    cfg = dict(
-        size=300,
-        num_classes=2,
-        default_boxes=[4, 6, 6, 6, 4, 4],
-    )
+    cfg = dict(size=300, num_classes=2, default_boxes=[4])  # , 4, 6, 6, 4, 4],
     ssd_net = SSD(ResNet(backbone_path=args.weights), cfg)
 
     learning_rate = args.lr * (batch_size / 32)
