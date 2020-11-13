@@ -10,7 +10,7 @@ import torch.utils.data as data
 from torch.optim import SGD
 from torch.optim.lr_scheduler import MultiStepLR
 
-from ssd import make_ssd
+from ssd import ResNet, SSD
 from loss import MultiBoxLoss
 from utils.augmentations import get_transform
 from utils.geometry import encode
@@ -73,7 +73,17 @@ def train(args):
     )
 
     # Model init
-    ssd_net = make_ssd(300, 2)
+    cfg = dict(
+        size=300,
+        num_classes=2,
+        default_boxes=[4, 6, 6, 6, 4, 4],
+        feature_maps=[38, 19, 10, 5, 3, 1],
+        s_min=0.2,
+        s_max=0.9,
+        aspect_ratios=[[2], [2, 3], [2, 3], [2, 3], [2], [2]],
+    )
+    ssd_net = SSD(ResNet(backbone_path=args.weights), cfg)
+
     learning_rate = args.lr * (batch_size / 32)
     optimizer = SGD(
         ssd_net.parameters(),
@@ -89,8 +99,6 @@ def train(args):
         criterion = criterion.cuda()
 
     # Weights
-    vgg_weights = torch.load(args.weights)
-    ssd_net.base.load_state_dict(vgg_weights)
     ssd_net._init_weights()
 
     ssd_net.train()
