@@ -12,12 +12,18 @@ def priors() -> torch.Tensor:
 
     :return: Tensor of default boxes in center-size form
     :rtype: torch.Tensor
+
+    Original:
+    feat_size = [38, 19, 10, 5, 3, 1]
+    steps = [8, 16, 32, 64, 100, 300]
+    scales = [21, 45, 99, 153, 207, 261, 315]
+    aspect_ratios = [[2], [2, 3], [2, 3], [2, 3], [2], [2]]
     """
     fig_size = 300
     feat_size = [19]  # , 10, 5, 3, 1]
-    steps = [16]  # , 32, 64, 100, 300]
+    steps = [16, 32, 64, 100, 300]
     # use the scales here: https://github.com/amdegroot/ssd.pytorch/blob/master/data/config.py
-    scales = [45, 99, 153, 207, 261, 315]
+    scales = [99, 153, 207, 261, 315]
     aspect_ratios = [[2], [2], [2, 3], [2, 3], [2], [2]]
     fk = fig_size / np.array(steps)
     locations = []
