@@ -15,19 +15,19 @@ class ResNet(nn.Module):
     def __init__(self, backbone='resnet50', backbone_path=None):
         super().__init__()
         if backbone == 'resnet18':
-            backbone = resnet18(pretrained=not backbone_path)
+            backbone = resnet18(pretrained=False)
             self.out_channels = [256, 512, 512, 256, 256, 128]
         elif backbone == 'resnet34':
-            backbone = resnet34(pretrained=not backbone_path)
+            backbone = resnet34(pretrained=False)
             self.out_channels = [256, 512, 512, 256, 256, 256]
         elif backbone == 'resnet50':
-            backbone = resnet50(pretrained=not backbone_path)
+            backbone = resnet50(pretrained=False)
             self.out_channels = [1024, 512, 512, 256, 256, 256]
         elif backbone == 'resnet101':
-            backbone = resnet101(pretrained=not backbone_path)
+            backbone = resnet101(pretrained=False)
             self.out_channels = [1024, 512, 512, 256, 256, 256]
         else:  # backbone == 'resnet152':
-            backbone = resnet152(pretrained=not backbone_path)
+            backbone = resnet152(pretrained=False)
             self.out_channels = [1024, 512, 512, 256, 256, 256]
         if backbone_path:
             backbone.load_state_dict(torch.load(backbone_path))
@@ -72,7 +72,7 @@ class SSD(nn.Module):
         self.num_classes = cfg['num_classes']
         self.size = cfg['size']
         self.default_boxes = cfg['default_boxes']
-        self.priors = priors(cfg)
+        self.priors = priors()
 
         self.base: ResNet = base
         self.extra = self._extra_layers(base.out_channels)
@@ -151,10 +151,6 @@ def make_ssd(num_classes: int = 2) -> SSD:
         size=300,
         num_classes=num_classes,
         default_boxes=[4, 6, 6, 6, 4, 4],
-        feature_maps=[38, 19, 10, 5, 3, 1],
-        s_min=0.2,
-        s_max=0.9,
-        aspect_ratios=[[2], [2, 3], [2, 3], [2, 3], [2], [2]],
     )
     base = ResNet()
     return SSD(base, cfg)

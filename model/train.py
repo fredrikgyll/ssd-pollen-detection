@@ -77,10 +77,6 @@ def train(args):
         size=300,
         num_classes=2,
         default_boxes=[4, 6, 6, 6, 4, 4],
-        feature_maps=[38, 19, 10, 5, 3, 1],
-        s_min=0.2,
-        s_max=0.9,
-        aspect_ratios=[[2], [2, 3], [2, 3], [2, 3], [2], [2]],
     )
     ssd_net = SSD(ResNet(backbone_path=args.weights), cfg)
 
