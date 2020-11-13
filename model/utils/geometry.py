@@ -168,8 +168,9 @@ def rescale_batch(
 
     # ploc has offsets relative to the default boxcoordinates so must be transformed
     # to actual bounding boxes
-    ploc[:, :, :2] = ploc[:, :, :2] * defaults[:, 2:] + defaults[:, :2]
-    ploc[:, :, 2:] = ploc[:, :, 2:].exp() * defaults[:, 2:]
+    dboxes = defaults.unsqueeze(dim=0)
+    ploc[:, :, :2] = ploc[:, :, :2] * dboxes[:, :, 2:] + dboxes[:, :, :2]
+    ploc[:, :, 2:] = ploc[:, :, 2:].exp() * dboxes[:, :, 2:]
 
     ploc = torch.cat(
         (
