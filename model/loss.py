@@ -22,8 +22,8 @@ class MultiBoxLoss(nn.Module):
         dwh = self.dboxes[:, 2:, :]
         gxy = gloc[:, :2, :]
         gwh = gloc[:, 2:, :]
-        gxy = (gxy - dxy) / dwh
-        gwh = (gwh / dwh).log()
+        gxy = (1.0 / 0.1) * (gxy - dxy) / dwh
+        gwh = (1.0 / 0.2) * (gwh / dwh).log()
         return torch.cat((gxy, gwh), dim=1).contiguous()
 
     def hard_negative_mining(self, loss, mask, pos_num):
@@ -42,7 +42,7 @@ class MultiBoxLoss(nn.Module):
         return closs
 
     def forward(
-        self, ploc: Tensor, pconf: Tensor, gloc: Tensor, glabel: Tensor
+        self, iteration: int, ploc: Tensor, pconf: Tensor, gloc: Tensor, glabel: Tensor
     ) -> Tensor:
         # assert ploc.size() == torch.Size([self.batch_size, 4, 8732])
         # assert gloc.size() == torch.Size([self.batch_size, 4, 8732])
@@ -61,6 +61,10 @@ class MultiBoxLoss(nn.Module):
 
         closs = self.conf_loss_func(pconf, glabel)
         con_loss = self.hard_negative_mining(closs, mask, num_pos)
+
+        if 'plotter' in globals():
+            plotter.plot('loss', 'conf', 'Conf Loss', iteration, con_loss.mean(0))
+            plotter.plot('loss', 'loc', 'Loc Loss', iteration, loc_loss.mean(0))
 
         # avoid no object detected
         total_loss = loc_loss + con_loss

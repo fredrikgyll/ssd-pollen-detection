@@ -9,6 +9,7 @@ import torch
 import torch.utils.data as data
 from torch.optim import SGD
 from torch.optim.lr_scheduler import MultiStepLR
+from plotting import VisdomLinePlotter
 
 from ssd import ResNet, SSD
 from loss import MultiBoxLoss
@@ -20,6 +21,9 @@ from utils.logger import Logger
 parser = argparse.ArgumentParser(description='Train SSD300 model')
 parser.add_argument(
     '--cuda', action='store_true', help='Train model on cuda enabled GPU'
+)
+parser.add_argument(
+    '--viz', action='store_true', help='Enable live plotting with Visdom'
 )
 parser.add_argument('--data', '-d', type=Path, help='path to data directory')
 parser.add_argument('--weights', '-w', type=Path, help='Path to VGG16 weights')
@@ -145,4 +149,7 @@ def train(args):
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    if args.viz:
+        global plotter
+        plotter = VisdomLinePlotter(env_name='SSD300')
     train(args)
