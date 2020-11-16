@@ -61,7 +61,7 @@ def train(args):
     # Data
     root = args.data
     transforms = get_transform()
-    dataset = Pollene1Dataset(root, transforms)
+    dataset = Pollene1Dataset(root, 'train', transforms)
     logger(f'Iterations in dataset {len(dataset)//batch_size}')
     data_loader = data.DataLoader(
         dataset,

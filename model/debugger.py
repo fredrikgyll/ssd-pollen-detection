@@ -10,7 +10,7 @@ from evaluate import evaluate
 from ssd import make_ssd
 
 from utils.augmentations import DeNormalize, get_transform
-from utils.data import Pollene1Dataset, Pollene1DatasetTest, collate
+from utils.data import Pollene1Dataset, collate
 
 
 def run_model():
@@ -98,7 +98,7 @@ def data_pipeline():
 
     root = Path('/Users/fredrikg/Projects/pollendb1/data')
     transform = get_transform()
-    dataset = Pollene1Dataset(root, transform)
+    dataset = Pollene1Dataset(root, 'train', transform)
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=8, shuffle=True, num_workers=1, collate_fn=collate
     )
@@ -120,7 +120,7 @@ def evaluate_model():
     root = Path('/Users/fredrikg/Projects/pollendb1/data')
 
     transforms = get_transform(train=False)
-    dataset = Pollene1DatasetTest(root, transforms)
+    dataset = Pollene1Dataset(root, 'test', transforms)
     data_loader = DataLoader(
         dataset,
         batch_size=8,

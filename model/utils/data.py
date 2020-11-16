@@ -7,16 +7,16 @@ from .augmentations import TransformerSequence
 
 
 class Pollene1Dataset:
-    def __init__(self, root: Path, transform: TransformerSequence) -> None:
+    def __init__(self, root: Path, mode: str, transform: TransformerSequence) -> None:
         self.transform = transform
-        self.bboxes = pickle.load((root / 'annotations/train_bboxes.pkl').open('rb'))
-        image_dir = root / 'train'
-        self.images = list(sorted(image_dir.glob('*.jpg')))
+        self.bboxes = pickle.load((root / f'annotations/{mode}.pkl').open('rb'))
+        self.image_dir = root / mode
+        self.images = list(sorted(self.bboxes.keys()))
 
     def __getitem__(self, idx):
         file = self.images[idx]
-        im = Image.open(file)
-        bboxes = self.bboxes[file.name]
+        im = Image.open(self.image_dir / file)
+        bboxes = self.bboxes[file]
         labels = torch.ones(bboxes.size(0))
         im, bboxes, labels = self.transform(im, bboxes, labels)
         return im, bboxes, labels

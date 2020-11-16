@@ -20,11 +20,12 @@ def priors() -> torch.Tensor:
     aspect_ratios = [[2], [2, 3], [2, 3], [2, 3], [2], [2]]
     """
     fig_size = 300
-    feat_size = [19]  # , 10, 5, 3, 1]
+    feat_size = [38, 19, 10, 5, 3, 1]
     steps = [16, 32, 64, 100, 300]
-    # use the scales here: https://github.com/amdegroot/ssd.pytorch/blob/master/data/config.py
+    # use the scales here:
+    # https://github.com/amdegroot/ssd.pytorch/blob/master/data/config.py
     scales = [99, 153, 207, 261, 315]
-    aspect_ratios = [[2], [2], [2, 3], [2, 3], [2], [2]]
+    aspect_ratios = [[2], [2, 3], [2, 3], [2, 3], [2], [2]]
     fk = fig_size / np.array(steps)
     locations = []
     for idx, sfeat in enumerate(feat_size):

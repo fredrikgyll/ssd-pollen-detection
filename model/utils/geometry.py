@@ -184,9 +184,13 @@ def rescale_batch(
 
 
 def nms(
-    bbox: Tensor, prob: Tensor, soft: bool, iou_thr: float, score_thr: float
+    bbox: Tensor,
+    prob: Tensor,
+    soft: bool,
+    iou_thr: float,
+    score_thr: float,
+    max_num: int,
 ) -> Tensor:
-    max_num = 25
     out_boxes = []
     out_labels = []
     out_confs = []
@@ -199,7 +203,7 @@ def nms(
 
         score_idx = score_idx[:max_num]
         score_sorted = score_sorted[:max_num]
-
+        # print(score_sorted)
         chosen_for_label = []
         while score_idx.size(0) > 0:
             # print(score_idx.size(0))
@@ -236,23 +240,86 @@ def nms(
     return (out_boxes[indexes, :], out_confs[indexes], out_labels[indexes])
 
 
+def decode_single(bboxes_in, scores_in, criteria, max_output, max_num=200):
+    # Reference to https://github.com/amdegroot/ssd.pytorch
+
+    bboxes_out = []
+    scores_out = []
+    labels_out = []
+
+    for i, score in enumerate(scores_in.split(1, 1)):
+        # skip background
+        # print(score[score>0.90])
+        if i == 0:
+            continue
+        # print(i)
+
+        score = score.squeeze(1)
+        mask = score > 0.05
+
+        bboxes, score = bboxes_in[mask, :], score[mask]
+        if score.size(0) == 0:
+            continue
+
+        score_sorted, score_idx_sorted = score.sort(dim=0)
+
+        # select max_output indices
+        score_idx_sorted = score_idx_sorted[-max_num:]
+        candidates = []
+        # maxdata, maxloc = scores_in.sort()
+
+        while score_idx_sorted.numel() > 0:
+            idx = score_idx_sorted[-1].item()
+            bboxes_sorted = bboxes[score_idx_sorted, :]
+            bboxes_idx = bboxes[idx, :].unsqueeze(dim=0)
+            iou_sorted = jaccard(bboxes_sorted, bboxes_idx).squeeze()
+            # we only need iou < criteria
+            score_idx_sorted = score_idx_sorted[iou_sorted < criteria]
+            candidates.append(idx)
+
+        bboxes_out.append(bboxes[candidates, :])
+        scores_out.append(score[candidates])
+        labels_out.extend([i] * len(candidates))
+
+    if not bboxes_out:
+        return [torch.tensor([]) for _ in range(3)]
+
+    bboxes_out, labels_out, scores_out = (
+        torch.cat(bboxes_out, dim=0),
+        torch.tensor(labels_out, dtype=torch.long),
+        torch.cat(scores_out, dim=0),
+    )
+
+    _, max_ids = scores_out.sort(dim=0)
+    max_ids = max_ids[-max_output:]
+    return bboxes_out[max_ids, :], scores_out[max_ids], labels_out[max_ids]
+
+
 def decode(
     defaults: Tensor,
     ploc: Tensor,
     pconf: Tensor,
     soft: bool = True,
-    iou_thr: float = 0.45,
-    score_thr: float = 0.05,
+    iou_thr: float = 0.5,
+    score_thr: float = 0.001,
+    max_num: int = 25,
 ) -> Tensor:
     """Transform the model output into bounding boxes and perform NMS on each image"""
 
     bboxes, probs = rescale_batch(defaults, ploc, pconf)
 
     output_boxes = []
+    output_labels = []
+    output_cofs = []
     for bbox, prob in zip(bboxes.split(1, dim=0), probs.split(1, dim=0)):
         bbox = bbox.squeeze(0)
         prob = prob.squeeze(0)
-        output_boxes.append(
-            nms(bbox, prob, soft, iou_thr, score_thr)[0]
-        )  # TODO get labels and conf
-    return torch.cat(output_boxes, 0)
+        # boxes, conf, labels = nms(bbox, prob, soft, iou_thr, score_thr, max_num)
+        boxes, conf, labels = decode_single(
+            bbox, prob, criteria=0.45, max_output=200, max_num=50
+        )
+
+        output_boxes.append(boxes)
+        output_cofs.append(conf)
+        output_labels.append(labels)
+    return (output_boxes, output_cofs, output_labels)

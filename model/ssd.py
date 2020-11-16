@@ -78,7 +78,7 @@ class SSD(nn.Module):
         self.extra = self._extra_layers(base.out_channels)
 
         _loc_layers, _conf_layers = [], []
-        for oc, nd in zip(self.base.out_channels[1:], self.default_boxes):
+        for oc, nd in zip(self.base.out_channels, self.default_boxes):
             _loc_layers.append(nn.Conv2d(oc, 4 * nd, kernel_size=3, padding=1))
             _conf_layers.append(
                 nn.Conv2d(oc, self.num_classes * nd, kernel_size=3, padding=1)
@@ -97,7 +97,7 @@ class SSD(nn.Module):
         x = self.base(x)
         # feat_layer = 0
         # print(f'layer {feat_layer}: {x.size(2)}')
-        source_layers = []
+        source_layers = [x]
         for layer in self.extra:
             x = layer(x)
             source_layers.append(x)
@@ -117,7 +117,7 @@ class SSD(nn.Module):
 
     def _extra_layers(self, in_channels: List[int]) -> nn.ModuleList:
         # Extra layers for feature scaling
-        channels = [256]  # , 256 , 128, 128, 128]
+        channels = [256, 256, 128, 128, 128]
         layers = []
         for i, (ins, outs, middles) in enumerate(
             zip(in_channels[:-1], in_channels[1:], channels)
@@ -148,7 +148,9 @@ class SSD(nn.Module):
 
 def make_ssd(num_classes: int = 2) -> SSD:
     cfg = dict(
-        size=300, num_classes=num_classes, default_boxes=[4]  # , 4, 6, 6, 4, 4],
+        size=300,
+        num_classes=num_classes,
+        default_boxes=[4, 6, 6, 6, 4, 4],
     )
     base = ResNet()
     return SSD(base, cfg)
