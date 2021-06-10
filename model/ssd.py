@@ -92,7 +92,15 @@ class SSD(nn.Module):
 
         if phase == 'test':
             self.softmax = nn.Softmax(dim=-1)
-            self.detect = Detect(self.num_classes, 0, 30, 0.01, 0.45, cfg['variances'])
+            self.detect = Detect(
+                num_classes=self.num_classes, 
+                bkg_label=0, 
+                top_k=50, 
+                area_thresh=0.1,
+                conf_thresh=0.1, 
+                nms_thresh=0.45, 
+                variances=cfg['variances']
+            )
 
     def _init_weights(self):
         layers = [*self.extra, *self.loc_head, *self.conf_head]

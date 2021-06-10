@@ -75,9 +75,12 @@ class AstmaDataset:
         file = self.images[idx]
         img = cv2.imread(str(self.image_dir / file))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = cv2.resize(img, (960, 540))
 
         target = self.bboxes[file]
         target = target.astype(float)
+        target[:,:4] /= 2
+        # target = target[target[:,4] != 3]
 
         im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
 
