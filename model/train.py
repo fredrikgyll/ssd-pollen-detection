@@ -156,12 +156,15 @@ def train(args):
                 logger(f'Loss Iter. {bidx:02d}: {loss.item():6.3f}')
 
         elapsed = int(time.time() - t1)
+        total_elapsed = int(time.time() - t0)
+        eta = (total_elapsed / (i + 1)) * (args.epochs - i - 1)
         loss_hist.extend(epoch_loss)
         if (i + 1) % 10 == 0:
             torch.save(ssd_net.state_dict(), save_dir / f'ssd_epoch_{i:02d}.pth')
 
         logger(f"Mean Loss:\t{np.mean(epoch_loss):4.2f}")
         logger(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
+        logger(f"ETA:\t{datetime.timedelta(seconds=eta)}")
     elapsed = int(time.time() - t0)
     loss_file = save_dir / 'loss_hist.pkl'
     torch.save(ssd_net.state_dict(), save_dir / 'ssd_last.pth')
