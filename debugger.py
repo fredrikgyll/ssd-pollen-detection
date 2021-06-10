@@ -8,13 +8,12 @@ from PIL import Image
 from torch.utils.data.dataloader import DataLoader
 from torchvision.transforms.functional import to_pil_image
 
-from model.evaluate import evaluate
 from model.priors.priors import PriorBox
 from model.ssd import make_ssd
 from model.utils.augmentations import DeNormalize, SSDAugmentation
 from model.utils.data import AstmaDataset, Pollene1Dataset, collate
 
-model_name = '2021-03-31T18-40-08'
+model_name = '2021-04-06T09-11-21'
 model_ch = Path('/Users/fredrikg/Projects/pollendb1/saves') / f'{model_name}.pth'
 
 
@@ -98,7 +97,6 @@ def show_img(name):
 
 
 def data_pipeline():
-    from model.utils.data import Pollene1Dataset, collate
 
     root = Path('/Users/fredrikg/Projects/pollendb1/data')
     transform = SSDAugmentation()
@@ -111,35 +109,6 @@ def data_pipeline():
     print(image.shape)
     print(bboxes.shape)
     print(labels.shape)
-
-
-def evaluate_model():
-    import model.matplotlib.pyplot as plt
-
-    model = make_ssd()
-    model_state = torch.load(model_ch, map_location=torch.device('cpu'))
-    model.load_state_dict(model_state)
-
-    root = Path('/Users/fredrikg/Projects/pollendb1/data')
-
-    transform = SSDAugmentation(train=False)
-    dataset = Pollene1Dataset(root, 'test', transform)
-    data_loader = DataLoader(
-        dataset,
-        batch_size=8,
-        shuffle=False,
-        num_workers=2,
-        collate_fn=collate,
-        pin_memory=True,
-    )
-    batches = len(dataset) // 8
-    print(f'# of batches: {batches}')
-    args = namedtuple('args', ['cuda'])
-    args.cuda = False
-    p, r = evaluate(model, data_loader, args)
-    _, ax = plt.subplots()
-    ax.plot(r, p)
-    plt.show()
 
 
 def infer(name):
@@ -220,7 +189,7 @@ def infer2():
     out = []
     for i in [1, 2, 3]:
         dets = detections[0, i, ...]  # only one class which is nr. 1
-        mask = dets[:, 0].gt(0.2)
+        mask = dets[:, 0].gt(0.0)
         dets = dets[mask, ...]
         out.append(dets.data)
 
@@ -241,14 +210,19 @@ def infer2():
         'alnus': lambda xy, w, h: (xy[0] + w, xy[1] + h + 10),
     }
 
-    for (*xy, w, h), l in zip(boxes, labels.int()):
+    for (*xy, w, h), l in zip(boxes, labels.int().tolist()):
         ax.add_patch(patches.Rectangle(xy, w, h, edgecolor='green', fill=False))
         ax.text(*offsets['gt'](xy, w, h), dataset.labels[l], color='green', fontsize=10)
     for lab, boxes, confs in zip(dataset.labels, out_bbox, out_conf):
         for (*xy, w, h), c in zip(boxes, confs):
+            if not confs.size:
+                continue
             ax.add_patch(patches.Rectangle(xy, w, h, edgecolor=colors[lab], fill=False))
             ax.text(
-                *offsets[l](xy, w, h), f'{lab} {c:.2f}', color=colors[lab], fontsize=10
+                *offsets[lab](xy, w, h),
+                f'{lab} {c:.2f}',
+                color=colors[lab],
+                fontsize=10,
             )
     ax.set_axis_off()
     plt.show()

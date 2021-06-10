@@ -7,7 +7,7 @@ def make_pr_curves(metrics, classes, with_interpolations=False, save=None):
         ncols=len(classes), sharex=True, sharey=True, figsize=(15, 6)
     )
     inter_x = np.repeat(np.linspace(0, 1, 11), 2)[1:]
-    
+
     for ax, cls in zip(axs, classes):
         recall = metrics[cls]['recall']
         precision = metrics[cls]['precision']
@@ -19,9 +19,9 @@ def make_pr_curves(metrics, classes, with_interpolations=False, save=None):
         ax.set_xticks(np.linspace(0, 1, 11))
         ax.set_yticks(np.linspace(0, 1, 11))
         ax.grid(which='both')
-    
+
     # dummy axes for axis labels to attach to
-    frame =fig.add_subplot(111, frameon=False)
+    frame = fig.add_subplot(111, frameon=False)
     frame.set_xticks([])
     frame.set_yticks([])
     plt.xlabel("Recall", labelpad=25)
@@ -73,7 +73,7 @@ def make_detection_results_bars(metrics, classes, save=None):
     ax.set_xticks(x_pos)
     ax.set_xticklabels(classes)
     ax.set_ylabel('Count')
-    ax.set_title(f'Detection Results')
+    ax.set_title('Detection Results')
 
     ax.bar_label(rect1, label_type='center', color='w')
     ax.bar_label(rect2, label_type='center', color='w')
@@ -82,6 +82,24 @@ def make_detection_results_bars(metrics, classes, save=None):
     # ax.set_xlim(0, 1.1)
     fig.tight_layout()
     plt.legend()
+    if save:
+        plt.savefig(save)
+    else:
+        plt.show()
+
+
+def make_run_map(iter, test, train, save=None):
+
+    fig, ax = plt.subplots()
+    ax.plot(iter, test, '+:r', label='test')
+    ax.plot(iter, train, 'x--g', label='train')
+    plt.xlabel('Iteration')
+    plt.ylabel('mAP')
+    plt.title('mAP')
+    plt.legend()
+    plt.grid()
+    fig.tight_layout()
+
     if save:
         plt.savefig(save)
     else:
