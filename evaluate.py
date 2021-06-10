@@ -1,7 +1,6 @@
 import argparse
 import pickle
 from collections import defaultdict
-from os import sep
 from pathlib import Path
 
 import numpy as np
@@ -15,7 +14,7 @@ from model.utils.augmentations import SSDAugmentation
 from model.utils.data import HDF5Dataset
 from model.utils.geometry import jaccard
 
-parser = argparse.ArgumentParser(description='Train SSD300 model')
+parser = argparse.ArgumentParser(description='Evaluate SSD300 model')
 
 parser.add_argument('--checkpoint', '-c', type=Path, help='Path to model checkpoint')
 parser.add_argument('--data', '-d', type=Path, help='path to data directory')
@@ -67,10 +66,10 @@ if __name__ == "__main__":
                     dets = dets[mask, ...]
                     sorted_conf, order_idx = dets[:, 0].sort(descending=True)
                     iou = jaccard(dets[order_idx, 1:], truth)
-                    preds = torch.zeros(dets.size(0))
+                    preds = torch.zeros(dets.size(0), dtype=int)
 
                     for ground_column in iou.split(1, 1):
-                        tp = torch.nonzero(ground_column.squeeze() > 0.5).squeeze(-1)
+                        tp = torch.nonzero(ground_column.squeeze(-1) > 0.5).squeeze(-1)
                         if tp.nelement() > 0:
                             preds[tp[0]] = 1
                     predictions[name].append(preds)
@@ -80,11 +79,15 @@ if __name__ == "__main__":
         preds = torch.cat(predictions[name], dim=0)
         confs = torch.cat(confidences[name], dim=0)
         _, order = confs.sort(descending=True)
-        preds = torch.cumsum(preds[order], dim=0).cpu().numpy()
+        preds_cum = torch.cumsum(preds[order], dim=0).cpu().numpy()
 
         out[name] = {
-            'precision': preds / np.arange(1, preds.size + 1),
-            'recall': preds / n_gth[name],
+            'precision': preds_cum / np.arange(1, preds_cum.size + 1),
+            'recall': preds_cum / n_gth[name],
+            'ground_truths': n_gth[name],
+            'total_detections': preds.size(0),
+            'tp': (preds == 1).sum().item(),
+            'fp': (preds == 0).sum().item(),
         }
 
     (args.output / 'map.pkl').write_bytes(pickle.dumps(out))

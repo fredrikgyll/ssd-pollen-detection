@@ -50,7 +50,6 @@ if args.ignore is None:
 
 specific_iou_flagged = args.set_class_iou is not None
 
-
 ROOT = Path(args.input)
 
 GT_PATH: Path = ROOT / 'ground-truth'
