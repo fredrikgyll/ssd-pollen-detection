@@ -163,24 +163,27 @@ def encode(
 def rescale_batch(
     defaults: Tensor, ploc: Tensor, pconf: Tensor
 ) -> Tuple[Tensor, Tensor]:
-    ploc = ploc.transpose(1, 2)  # (N, nboxes, 4)
-    pconf = pconf.transpose(1, 2)  # (N, nboxes, nclasses)
+    ploc = ploc.permute(0, 2, 1)  # (N, nboxes, 4)
+    pconf = pconf.permute(0, 2, 1)  # (N, nboxes, nclasses)
 
     # ploc has offsets relative to the default boxcoordinates so must be transformed
     # to actual bounding boxes
-    dboxes = defaults.unsqueeze(dim=0)
 
 
-    ploc[:, :, :2] = ploc[:, :, :2] * dboxes[:, :, 2:] + dboxes[:, :, :2]
-    ploc[:, :, 2:] = ploc[:, :, 2:].exp() * dboxes[:, :, 2:]
+    ploc[:, :, :2] = ploc[:, :, :2] * defaults[:, 2:] + defaults[:, :2]
+    ploc[:, :, 2:] = ploc[:, :, 2:].exp() * defaults[:, 2:]
 
-    ploc = torch.cat(
-        (
-            ploc[:, :, :2] - (ploc[:, :, 2:] / 2.0),
-            ploc[:, :, :2] + (ploc[:, :, 2:] / 2.0),
-        ),
-        dim=2,
-    )
+    # ploc = torch.cat((ploc[:, :, :2] - 0.5 *ploc[:, :, 2:],ploc[:, :, :2] + ploc[:, :, 2:]),dim=2)
+    
+    l, t, r, b = (ploc[:, :, 0] - 0.5*ploc[:, :, 2],
+                     ploc[:, :, 1] - 0.5*ploc[:, :, 3],
+                     ploc[:, :, 0] + 0.5*ploc[:, :, 2],
+                     ploc[:, :, 1] + 0.5*ploc[:, :, 3])
+
+    ploc[:, :, 0] = l
+    ploc[:, :, 1] = t
+    ploc[:, :, 2] = r
+    ploc[:, :, 3] = b
 
     return ploc, F.softmax(pconf, dim=2)
 
