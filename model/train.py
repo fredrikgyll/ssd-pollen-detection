@@ -15,7 +15,7 @@ from plotting import VisdomLinePlotter
 from ssd import ResNet, SSD
 from loss import MultiBoxLoss
 from utils.augmentations import SSDAugmentation
-from utils.data import AstmaDataset, collate
+from utils.data import HDF5Dataset, collate
 from utils.logger import Logger
 
 parser = argparse.ArgumentParser(description='Train SSD300 model')
@@ -77,7 +77,7 @@ def train(args):
     # Data
     root = args.data
     transforms = SSDAugmentation()
-    dataset = AstmaDataset(root, 'train', transforms)
+    dataset = HDF5Dataset(root, 'random', 'train', transforms)
     logger(f'Iterations in dataset {len(dataset)//batch_size}')
     data_loader = data.DataLoader(
         dataset,
