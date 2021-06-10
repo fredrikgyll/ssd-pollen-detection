@@ -53,7 +53,7 @@ parser.add_argument(
     '--multistep',
     nargs='*',
     type=int,
-    default=[5000],
+    default=[10000],
     help='epochs at which to decay learning rate',
 )
 parser.add_argument('--push', action='store_true', help='Push final model to bunnyCDN')

@@ -124,7 +124,9 @@ def evaluate_run(run_dir: Path, data_root: Path, class_subset, quiet=True):
         model.load_state_dict(model_state, strict=True)
         metrics = [evaluate(model, dst, class_subset, quiet=quiet) for dst in datasets]
         maps.append([calc_map(m, class_subset) for m in metrics])
-    test_map, train_map = list(zip(*[np.array(m) for m in maps]))
+    test_map, train_map = list(zip(*maps))
+    test_map = np.array(test_map)
+    train_map = np.array(train_map)
 
     order_idx = np.argsort(points)
     return points[order_idx], test_map[order_idx], train_map[order_idx]

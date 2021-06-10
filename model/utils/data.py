@@ -38,7 +38,7 @@ class HDF5Dataset:
     def __init__(self, root: Path, dataset: str, mode: str, transform) -> None:
         self.transform = transform
         self.data_file = root
-        self.labels = ['poaceae', 'corylus', 'alnus', 'unknown']
+        self.labels = ['poaceae', 'corylus', 'alnus']
         with h5py.File(self.data_file, 'r') as f:
             self.names = f[f'datasets/{dataset}/{mode}'][()]
 
@@ -55,6 +55,7 @@ class HDF5Dataset:
         target = self.annotations.get(file)[()]
 
         target = target.astype(float)
+        target = target[target[:, 4] != 3, :]
         im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
 
         target = torch.hstack((bboxes, labels.unsqueeze(1)))
@@ -70,7 +71,7 @@ class AstmaDataset:
         self.bboxes = pickle.load((root / f'annotations/{mode}.pkl').open('rb'))
         self.image_dir = root / 'Images'
         self.images = list(sorted(self.bboxes.keys()))
-        self.labels = ['poaceae', 'corylus', 'alnus', 'unknown']
+        self.labels = ['poaceae', 'corylus', 'alnus']
 
     def __getitem__(self, idx):
         file = self.images[idx]
@@ -81,7 +82,7 @@ class AstmaDataset:
         target = self.bboxes[file]
         target = target.astype(float)
         target[:, :4] /= 2
-        # target = target[target[:,4] != 3]
+        target = target[target[:, 4] != 3, ...]
 
         im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
 
