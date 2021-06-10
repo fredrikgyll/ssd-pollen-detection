@@ -247,6 +247,22 @@ def nms(boxes, scores, overlap=0.5, top_k=200):
         idx = idx[IoU.le(overlap)]
     return keep, count
 
+def nms3(boxes: Tensor, scores: Tensor, overlap=0.5, top_k=200):
+    keep = []
+    
+    sorted_scores, sorted_scores_idx = scores.sort(descending=True)
+    mask = torch.ones_like(scores, dtype=bool)
+    sorted_boxes = boxes[sorted_scores_idx]
+
+    while mask.any():
+        keep.append(sorted_scores_idx[mask][0].item())
+        selected = boxes[keep[-1]]
+        iou = jaccard(selected.unsqueeze(0), sorted_boxes).squeeze()
+        iou_mask = iou.le(overlap)
+        mask &= iou_mask
+
+    keep = torch.tensor(keep)[:top_k]
+    return keep, len(keep)
 
 def nms2(
     bbox: Tensor,

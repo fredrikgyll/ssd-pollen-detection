@@ -1,7 +1,7 @@
 import torch
 from icecream import ic
 
-from model.utils.geometry import area, nms
+from model.utils.geometry import area, nms, nms3
 
 
 # Adapted from https://github.com/Hakuyume/chainer-ssd
@@ -93,6 +93,10 @@ class Detect:
                 boxes = decoded_boxes[l_mask].view(-1, 4)
                 # idx of highest scoring and non-overlapping boxes per class
                 ids, count = nms(boxes, scores, self.nms_thresh, self.top_k)
+                alt_ids, alt_count = nms3(boxes, scores, self.nms_thresh, self.top_k)
+                diff = set(ids.tolist()).difference(alt_ids.tolist())
+                if diff:
+                    ic(diff)
                 output[i, cl, :count] = torch.cat(
                     (scores[ids[:count]].unsqueeze(1), boxes[ids[:count]]), 1
                 )
