@@ -226,7 +226,7 @@ if __name__ == "__main__":
         'dataset': 'balanced1',
         'mode': 'train',
         'transform': transform,
-        'sharpness_bound': [0.0, 1],
+        'sharpness_bound': [0, 1],
     }
 
     logger('Dataset config:')

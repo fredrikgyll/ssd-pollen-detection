@@ -50,18 +50,24 @@ def calculate_true_positives(
             tps[tp[0]] = i
     return tps
 
+
 def calculate_detection_sharpness(detections: torch.Tensor, image: np.ndarray):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     h, w = image.shape
-    bbox = torch.stack(
-        (
-            detections[:,0] * w,
-            detections[:,1] * h,
-            detections[:,3] * w,
-            detections[:,4] * h,
-        ),
-        dim=1
-    ).cpu().numpy()
+    bbox = (
+        torch.stack(
+            (
+                detections[:, 0] * w,
+                detections[:, 1] * h,
+                detections[:, 2] * w,
+                detections[:, 3] * h,
+            ),
+            dim=1,
+        )
+        .int()
+        .cpu()
+        .numpy()
+    )
     return image_bbox_quality(image, bbox)
 
 
@@ -130,7 +136,7 @@ def evaluate(model, dataset, class_subset, quiet=True):
         }
     gt_table = []
     fn_table = []
-    detection_table = {'sharpness': [], 'confidence': [], 'tp':[]}
+    detection_table = {'sharpness': [], 'confidence': [], 'tp': []}
     for cls in predictions.values():
         for example in cls:
             tp = example['tps'].ge(0)
@@ -146,11 +152,11 @@ def evaluate(model, dataset, class_subset, quiet=True):
             tps = example['truth_idx'][gt_id]
             for conf, gid in zip(example['confs'][tp], tps):
                 gt_table.append([file, gid.int().item(), conf.item()])
-                
+
             fn = set(example['truth_idx'].tolist()) - set(tps.tolist())
             fn_table.extend([[file, idx] for idx in fn])
 
     metrics['gt_table'] = gt_table
-    metrics['fn_table'] = gt_table
+    metrics['fn_table'] = fn_table
     metrics['detection_table'] = detection_table
     return metrics

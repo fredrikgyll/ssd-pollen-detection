@@ -30,10 +30,14 @@ class CV2Tensor:
         new_image = f.to_tensor(image)
         return new_image, boxes, labels
 
+
 class Tensor2CV:
     def __call__(self, image, boxes, labels):
-        new_img = image.transpose(1, 2, 0).mul(255).to(torch.uint8).cpu().numpy()
+        new_img = (
+            image.permute(1, 2, 0).clamp(0, 1).mul(255).to(torch.uint8).cpu().numpy()
+        )
         return new_img, boxes, labels
+
 
 class TargetsToTensor:
     def __call__(self, image, boxes, labels):
@@ -56,8 +60,8 @@ class Normalize:
     STD = [0.229, 0.224, 0.225]
 
     def __call__(self, image, boxes, labels):
-        f.normalize(image, self.MEAN, std=self.STD, inplace=True)
-        return image, boxes, labels
+        new_image = f.normalize(image, self.MEAN, std=self.STD)
+        return new_image, boxes, labels
 
 
 class DeNormalize:
@@ -65,8 +69,8 @@ class DeNormalize:
     BETA = [4.36681223, 4.46428571, 4.44444444]  # 1/std
 
     def __call__(self, image, boxes, labels):
-        f.normalize(image, self.ALPHA, std=self.BETA, inplace=True)
-        return image, boxes, labels
+        new_img = f.normalize(image, self.ALPHA, std=self.BETA)
+        return new_img, boxes, labels
 
 
 class RandomSubSample:
@@ -222,6 +226,7 @@ class SSDAugmentation:
     def __call__(self, img, boxes, labels):
         return self.augment(img, boxes, labels)
 
+
 class UnAugment:
     def __init__(self):
         transforms = [
@@ -231,4 +236,5 @@ class UnAugment:
         self.augment = TransformerSequence(transforms)
 
     def __call__(self, img):
-        return self.augment(img)
+        img, *_ = self.augment(img, 0, 0)
+        return img

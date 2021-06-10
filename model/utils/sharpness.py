@@ -16,9 +16,11 @@ def crop(img, bbox, padding=0):
 def bbox_crops(img, bboxes, padding=0):
     return [crop(img, bbox, padding) for bbox in bboxes]
 
+
 def image_quality(img: np.ndarray):
     if img.ndim == 3:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    img = cv2.resize(img, (100, 100))
     m, n = img.shape
     fft_img = np.abs(fft.fftshift(fft.fft2(img)))
     threshhold = np.max(fft_img) / 1000
@@ -30,4 +32,3 @@ def image_bbox_quality(img: np.ndarray, bboxes: np.ndarray):
     box_crops = bbox_crops(img, bboxes)
     qualities = [image_quality(im) for im in box_crops]
     return qualities
-
