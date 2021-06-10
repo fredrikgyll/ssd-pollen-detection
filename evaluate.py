@@ -89,7 +89,7 @@ def evaluate(model, dataset, class_subset, cuda=False, quiet=True):
             'ground_truths': n_gth[name],
             'total_detections': true_pos.size(0),
             'tp': true_pos.sum().item(),
-            'fp': (preds == 0).sum().item(),
+            'fp': (true_pos == 0).sum().item(),
         }
 
     return metrics
@@ -108,7 +108,7 @@ if __name__ == "__main__":
         '--output',
         '-o',
         type=Path,
-        detault=Path('./metrics.plk'),
+        default=Path('./metrics.pkl'),
         help='Path to save evaluation',
     )
     parser.add_argument(
