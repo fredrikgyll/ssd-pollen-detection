@@ -178,14 +178,13 @@ def rescale_batch(
 
     ploc = torch.cat(
         (
-            ploc[:, :, :2] - ploc[:, :, 2:] / 2.0,
-            ploc[:, :, :2] + ploc[:, :, 2:] / 2.0,
+            ploc[:, :, :2] - (ploc[:, :, 2:] / 2.0),
+            ploc[:, :, :2] + (ploc[:, :, 2:] / 2.0),
         ),
         dim=2,
     )
 
     return ploc, F.softmax(pconf, dim=2)
-
 
 def nms(
     bbox: Tensor,
@@ -200,35 +199,29 @@ def nms(
     out_confs = []
     for i, label_prob in enumerate(prob.split(1, 1)[1:]):
         scores = label_prob.squeeze(1)
-
-        mask = scores > score_thr
-        bboxes, scores = bbox[mask, :], scores[mask]
-        score_sorted, score_idx = scores.sort(dim=0, descending=True)
-
-        score_idx = score_idx[:max_num]
-        score_sorted = score_sorted[:max_num]
-        # print(score_sorted)
-        chosen_for_label = []
-        while score_idx.size(0) > 0:
-            # print(score_idx.size(0))
-            chosen_idx = score_idx[0].item()
-            chosen = bboxes[chosen_idx]
-            sorted_boxes = bboxes[score_idx, :]
-            chosen_for_label.append(chosen_idx)
-            chosen = chosen.unsqueeze(0)
-            iou_scores = jaccard(chosen, sorted_boxes).squeeze()
-            iou_mask = iou_scores < iou_thr
+        scores_sorted, scores_sorted_idx = scores.sort(dim=0, descending=True)
+        # return bbox[scores_sorted_idx[:100]], 0, 0 # Get all top boxes
+        picks = []
+        while scores_sorted_idx.numel():
+            chosen_idx = scores_sorted_idx[0]
+            chosen = bbox[chosen_idx].unsqueeze(0)
+            picks.append(chosen_idx)
+            iou = jaccard(chosen, bbox[scores_sorted_idx]).squeeze()
+            iou_mask = iou > iou_thr
             if soft:
-                score_sorted[~iou_mask] *= 1 - iou_scores[~iou_mask]
-                mask = score_sorted > score_thr
-                score_sorted, score_idx = score_sorted[mask], score_idx[mask]
-                score_sorted, score_idx = score_sorted.sort(dim=0, descending=True)
+                scores_sorted[iou_mask] *= 1-scores_sorted[iou_mask]
+                score_mask = scores_sorted > score_thr
+                scores_sorted_idx = scores_sorted_idx[score_mask]
+                scores_sorted = scores_sorted[score_mask]
+                _, new_order = scores_sorted.sort(dim=0, descending=True)
+                scores_sorted_idx = scores_sorted_idx[new_order]
             else:
-                score_idx = score_idx[iou_mask]
+                scores_sorted_idx = scores_sorted_idx[~iou_mask]
 
-        out_boxes.append(bbox[chosen_for_label, :])
-        out_confs.append(scores[chosen_for_label])
-        out_labels.extend([i + 1] * len(chosen_for_label))
+
+        out_boxes.append(bbox[picks, :])
+        out_confs.append(scores[picks])
+        out_labels.extend([i + 1] * len(picks))
 
     if not out_boxes:
         return (torch.tensor([]) for _ in range(3))
@@ -242,61 +235,6 @@ def nms(
     _, indexes = out_confs.sort(descending=True)
     indexes = indexes[:max_num]
     return (out_boxes[indexes, :], out_confs[indexes], out_labels[indexes])
-
-
-def decode_single(bboxes_in, scores_in, criteria, max_output, max_num=200):
-    # Reference to https://github.com/amdegroot/ssd.pytorch
-
-    bboxes_out = []
-    scores_out = []
-    labels_out = []
-
-    for i, score in enumerate(scores_in.split(1, 1)):
-        # skip background
-        # print(score[score>0.90])
-        if i == 0:
-            continue
-        # print(i)
-
-        score = score.squeeze(1)
-        mask = score > 0.05
-
-        bboxes, score = bboxes_in[mask, :], score[mask]
-        if score.size(0) == 0:
-            continue
-
-        score_sorted, score_idx_sorted = score.sort(dim=0)
-
-        # select max_output indices
-        score_idx_sorted = score_idx_sorted[-max_num:]
-        candidates = []
-        # maxdata, maxloc = scores_in.sort()
-
-        while score_idx_sorted.numel() > 0:
-            idx = score_idx_sorted[-1].item()
-            bboxes_sorted = bboxes[score_idx_sorted, :]
-            bboxes_idx = bboxes[idx, :].unsqueeze(dim=0)
-            iou_sorted = jaccard(bboxes_sorted, bboxes_idx).squeeze()
-            # we only need iou < criteria
-            score_idx_sorted = score_idx_sorted[iou_sorted < criteria]
-            candidates.append(idx)
-
-        bboxes_out.append(bboxes[candidates, :])
-        scores_out.append(score[candidates])
-        labels_out.extend([i] * len(candidates))
-
-    if not bboxes_out:
-        return [torch.tensor([]) for _ in range(3)]
-
-    bboxes_out, labels_out, scores_out = (
-        torch.cat(bboxes_out, dim=0),
-        torch.tensor(labels_out, dtype=torch.long),
-        torch.cat(scores_out, dim=0),
-    )
-
-    _, max_ids = scores_out.sort(dim=0)
-    max_ids = max_ids[-max_output:]
-    return bboxes_out[max_ids, :], scores_out[max_ids], labels_out[max_ids]
 
 
 def decode(
@@ -318,10 +256,8 @@ def decode(
     for bbox, prob in zip(bboxes.split(1, dim=0), probs.split(1, dim=0)):
         bbox = bbox.squeeze(0)
         prob = prob.squeeze(0)
-        # boxes, conf, labels = nms(bbox, prob, soft, iou_thr, score_thr, max_num)
-        boxes, conf, labels = decode_single(
-            bbox, prob, criteria=0.45, max_output=200, max_num=50
-        )
+        boxes, conf, labels = nms(bbox, prob, True, 0.2, 0.05, 10)
+        # boxes, conf, labels = decode_single(bbox, prob, criteria=iou_thr, max_output=max_num, max_num=50)
 
         output_boxes.append(boxes)
         output_cofs.append(conf)

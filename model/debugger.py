@@ -145,13 +145,13 @@ def infer(name):
     import matplotlib.patches as patches
 
     dim = 300
-    model_ch = Path('/Users/fredrikg/Projects/pollendb1/saves/2020-11-13T21-10-01.pth')
+    model_ch = Path('/Users/fredrikg/Projects/pollendb1/saves/2020-11-16T18-43-31.pth')
     model = make_ssd()
     model_state = torch.load(model_ch, map_location=torch.device('cpu'))
-    model.load_state_dict(model_state)
+    model.load_state_dict(model_state, strict=False)
 
-    p = Path('/Users/fredrikg/Projects/pollendb1/data/train')
-    trf = Path('/Users/fredrikg/Projects/pollendb1/data/annotations/train_bboxes.pkl')
+    p = Path('/Users/fredrikg/Projects/pollendb1/data/test')
+    trf = Path('/Users/fredrikg/Projects/pollendb1/data/annotations/test.pkl')
     train_labels = pickle.load(trf.open('rb'))
     boxes = train_labels[name]
     labels = torch.ones(len(boxes))
@@ -165,10 +165,10 @@ def infer(name):
     with torch.no_grad():
         ploc, pconf = model(img.unsqueeze(0))
         print('done out')
-        out_boxes = decode(model.priors, ploc, pconf)
+        out_boxes = decode(model.priors, ploc, pconf)[0]
     img, *_ = denorm(img, boxes, labels)
     boxes = np.clip(patch_boxes(boxes.numpy()) * dim, 0, dim)
-    out_boxes = np.clip(patch_boxes(out_boxes.numpy()) * dim, 0, dim)
+    out_boxes = np.clip(patch_boxes(out_boxes[0].numpy()) * dim, 0, dim)
 
     _, ax = plt.subplots()
     ax.imshow(to_plt_img(img), interpolation='none')
@@ -270,6 +270,6 @@ if __name__ == "__main__":
     # show_img('0090_108.jpg')
     # data_pipeline()
     # run_model()
-    # infer('0071_110.jpg')  # '0114_171.jpg')
+    infer('0038_069.jpg')  # '0114_171.jpg')
     # test_crit(['0114_171.jpg', '0403_055.jpg', '0090_108.jpg'])
-    evaluate_model()
+    # evaluate_model()
