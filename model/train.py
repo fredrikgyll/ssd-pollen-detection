@@ -77,7 +77,7 @@ def train(args):
     )
 
     # Model init
-    cfg = dict(size=300, num_classes=2, default_boxes=[4])  # , 4, 6, 6, 4, 4],
+    cfg = dict(size=300, num_classes=2, default_boxes=[4, 6, 6, 6, 4, 4])
     ssd_net = SSD(ResNet(backbone_path=args.weights), cfg)
     logger(f'Number of priors is {ssd_net.priors.size(0)}')
     logger(f'Number of extractor layers: {len(ssd_net.loc_head)+1}')
@@ -103,6 +103,7 @@ def train(args):
     loss_hist = []
 
     t0 = time.time()
+    iteration = 0
     for i in range(args.epochs):
         logger(f'===== Epoch {i:2d} =====')
         epoch_loss = []
@@ -129,6 +130,8 @@ def train(args):
             optimizer.step()
             scheduler.step()
             epoch_loss.append(loss.item())
+            plotter.plot('loss', 'train', 'Loss', iteration, loss.item())
+            iteration += 1
             if bidx % 10 == 0:
                 logger(f'Loss Iter. {bidx:02d}: {loss.item():6.3f}')
 
@@ -150,6 +153,7 @@ def train(args):
 if __name__ == "__main__":
     args = parser.parse_args()
     if args.viz:
+        print("plotting")
         global plotter
-        plotter = VisdomLinePlotter(env_name='SSD300')
+        plotter = VisdomLinePlotter(env_name='main')
     train(args)

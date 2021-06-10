@@ -72,7 +72,7 @@ class SSD(nn.Module):
         self.num_classes = cfg['num_classes']
         self.size = cfg['size']
         self.default_boxes = cfg['default_boxes']
-        self.priors = priors()
+        self.priors = nn.Parameter(priors(), requires_grad=False)
 
         self.base: ResNet = base
         self.extra = self._extra_layers(base.out_channels)
