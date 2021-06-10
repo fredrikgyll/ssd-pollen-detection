@@ -17,24 +17,25 @@ class ResNet(nn.Module):
     def __init__(self, backbone='resnet50', backbone_path=None):
         super().__init__()
         if backbone == 'resnet18':
-            backbone = resnet18(pretrained=False)
+            layers = resnet18(pretrained=False)
             self.out_channels = [256, 512, 512, 256, 256, 128]
         elif backbone == 'resnet34':
-            backbone = resnet34(pretrained=False)
+            layers = resnet34(pretrained=False)
             self.out_channels = [256, 512, 512, 256, 256, 256]
         elif backbone == 'resnet50':
-            backbone = resnet50(pretrained=False)
+            layers = resnet50(pretrained=False)
             self.out_channels = [1024, 512, 512, 256, 256, 256]
         elif backbone == 'resnet101':
-            backbone = resnet101(pretrained=False)
+            layers = resnet101(pretrained=False)
             self.out_channels = [1024, 512, 512, 256, 256, 256]
         else:  # backbone == 'resnet152':
-            backbone = resnet152(pretrained=False)
+            layers = resnet152(pretrained=False)
             self.out_channels = [1024, 512, 512, 256, 256, 256]
         if backbone_path:
-            backbone.load_state_dict(torch.load(backbone_path))
+            layers.load_state_dict(torch.load(backbone_path))
 
-        self.feature_extractor = nn.Sequential(*list(backbone.children())[:7])
+        self.backbone = backbone
+        self.feature_extractor = nn.Sequential(*list(layers.children())[:7])
 
         conv4_block1 = self.feature_extractor[-1][0]
 

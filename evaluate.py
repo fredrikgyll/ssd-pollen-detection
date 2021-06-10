@@ -77,10 +77,19 @@ if __name__ == "__main__":
 
     transforms = SSDAugmentation(train=False)
     dataset = HDF5Dataset(args.data, 'balanced1', args.mode, transforms)
-    model = make_ssd(phase='test', num_classes=len(dataset.labels) + 1)
-    model = model.cuda()
 
     state = torch.load(args.checkpoint, map_location=torch.device('cuda'))
+
+    cfg = dict(
+        size=state['size'],
+        num_classes=state['num_classes'],
+        layer_activation=state['layer_activations'],
+        default_boxes=state['default_boxes'],
+        variances=[0.1, 0.2],
+    )
+    model = make_ssd(phase='test', backbone=state.get('backbone', 'resnet34'), cfg=cfg)
+    model = model.cuda()
+
     model.load_state_dict(state['model_state_dict'], strict=True)
 
     metrics = evaluate(model, dataset, CLASSES, quiet=False)

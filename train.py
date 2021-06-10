@@ -97,6 +97,7 @@ def save_state(model, optimizer, criterion, scheduler, iteration, dir):
             'layer_activations': model.layer_activation,
             'size': model.size,
             'default_boxes': model.default_boxes,
+            'backbone': model.base.backbone,
         },
         save_name(dir, iteration),
     )
@@ -239,6 +240,8 @@ if __name__ == "__main__":
         default_boxes=[4, 6, 6, 6, 4, 4],
         variances=[0.1, 0.2],
     )
+    logger('Model config:')
+    logger(pformat(cfg, indent=4))
 
     model = make_ssd(
         num_classes=num_classes,

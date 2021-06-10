@@ -3,6 +3,7 @@ from collections import defaultdict
 import numpy as np
 import torch
 from tqdm.auto import tqdm
+from icecream import ic
 
 from model.utils.geometry import jaccard
 
@@ -76,7 +77,7 @@ def evaluate(model, dataset, class_subset, quiet=True):
             if mask.any():
                 dets = dets[mask, ...]
                 sorted_conf, order_idx = dets[:, 0].sort(descending=True)
-                tps = calculate_true_positives(detections[order_idx, 1:], truths)
+                tps = calculate_true_positives(dets[order_idx, 1:], truths)
                 predictions[name].append(tps)
                 confidences[name].append(sorted_conf)
 
