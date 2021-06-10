@@ -27,15 +27,17 @@ def _mk_box(*, target=None, detection=None, label=None, cls=None, dim=300, tp=Fa
         t = target.mul(dim).int()
         box = t[:2].tolist(), (t[2:4] - t[:2]).tolist()
         lab_idx = target[4].int().item()
+        text = cls[lab_idx][:3]
         conf = None
         key = 'gt'
     else:
+        conf = detection[0].item()
         t = detection.mul(dim).int()
         box = t[1:3].tolist(), (t[3:] - t[1:3]).tolist()
         lab_idx = label
-        conf = detection[0].item()
+        text = f'{cls[lab_idx][:3]} {conf:.0%}'
         key = 'tp' if tp else cls[lab_idx]
-    return {'box': box, 'label': cls[lab_idx][:3], 'conf': conf, 'key': key}
+    return {'box': box, 'label': text, 'conf': conf, 'key': key}
 
 
 def annotate_detection(image, targets, detections, class_list, name='', save=None):

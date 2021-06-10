@@ -11,7 +11,7 @@ from torchvision.transforms.functional import to_pil_image
 from model.priors.priors import PriorBox
 from model.ssd import make_ssd
 from model.utils.augmentations import DeNormalize, SSDAugmentation
-from model.utils.data import AstmaDataset, Pollene1Dataset, collate
+from model.utils.data import AstmaDataset 
 from model.utils.geometry import jaccard, point_form
 
 model_name = '2021-04-28T13-02-11'
@@ -96,21 +96,6 @@ def show_img(name):
     for *xy, w, h in fboxes:
         ax3.add_patch(patches.Rectangle(xy, w, h, edgecolor='blue', fill=False))
     plt.show()
-
-
-def data_pipeline():
-
-    root = Path('/Users/fredrikg/Projects/pollendb1/data')
-    transform = SSDAugmentation()
-    dataset = Pollene1Dataset(root, 'train', transform)
-    dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size=8, shuffle=True, num_workers=1, collate_fn=collate
-    )
-    dataiter = iter(dataloader)
-    image, bboxes, labels = next(dataiter)
-    print(image.shape)
-    print(bboxes.shape)
-    print(labels.shape)
 
 
 def infer():
