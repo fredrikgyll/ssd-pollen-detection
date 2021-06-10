@@ -1,7 +1,7 @@
 import pickle
 from collections import namedtuple
 from pathlib import Path
-
+from tqdm import tqdm
 import numpy as np
 import torch
 from PIL import Image
@@ -12,18 +12,20 @@ from model.priors.priors import PriorBox
 from model.ssd import make_ssd
 from model.utils.augmentations import DeNormalize, SSDAugmentation
 from model.utils.data import AstmaDataset, Pollene1Dataset, collate
+from model.utils.geometry import jaccard, point_form
 
-model_name = '2021-04-06T13-47-35'
+model_name = '2021-04-28T13-02-11'
 model_ch = Path('/Users/fredrikg/Projects/pollendb1/saves') / f'{model_name}.pth'
 
 
 def run_model():
-    from model.utils import decode
+    from torchsummary import summary
 
-    m = make_ssd()
+    model = make_ssd(phase='train')
+    summary(model, (3, 300, 300), 32)
     x = torch.randn(2, 3, 300, 300)
-    l, c = m(x)
-    print(decode(m.priors, l.abs(), c, soft=False))
+    l, c, p = model(x)
+    print(l.shape, c.shape, p.shape)
 
 
 def run_subsampler(name):
@@ -118,22 +120,86 @@ def infer():
 
     root = Path('/Users/fredrikg/Pictures/pollen_astma/')
     transform = SSDAugmentation(train=False)
-    dataset = AstmaDataset(root, 'test', transform)
+    dataset = AstmaDataset(root, 'balanced', 'test', transform)
 
-    model = make_ssd(phase='test', num_classes=len(dataset.labels) + 1)
     state = torch.load(model_ch, map_location=torch.device('cpu'))
+
+    cfg = dict(
+        size=state['size'],
+        num_classes=state['num_classes'],
+        layer_activation=state['layer_activations'],
+        default_boxes=state['default_boxes'],
+        variances=[0.1, 0.2],
+    )
+    model = make_ssd(phase='test', backbone=state.get('backbone', 'resnet34'), cfg=cfg)
+
     model.load_state_dict(state['model_state_dict'], strict=True)
 
-    lens = [len(dataset.bboxes[n]) for n in dataset.images]
-    sorted = np.argsort(lens)[::-1]
-
-    img, targets = dataset[sorted[10]]
-    # print(f'targets>\n{targets[:, :4]}')
     model.eval()
-    with torch.no_grad():
-        detections = model(img.unsqueeze(0))
+    for i, name in tqdm(enumerate(dataset.images), total=len(dataset)):
+        try:
+            img, targets = dataset[i]
+        except ValueError:
+            continue
+        with torch.no_grad():
+            detections = model(img.unsqueeze(0))
 
-    annotate_detection(img, targets, detections, dataset.labels)
+        annotate_detection(
+            img,
+            targets[:, :5],
+            detections,
+            dataset.labels,
+            save=f'tmp/detections/{name[:-4]}.png',
+        )
+
+
+def test_decoder():
+    def match(defaults, truths, threshhold: float = 0.5):
+        overlap = jaccard(point_form(defaults), truths)
+        # best_default, best_defailt_idx = torch.max(overlap, 0, keepdim=True)
+        # matches = overlap.ge(best_default) | overlap.ge(threshhold)
+        # return matches
+        #  element i in matched_targets is idx of matched truth box
+        matched_targets = torch.full((defaults.size(0),), -1)
+
+        # highest jaccard overlap for every default box
+        best_target, best_target_idx = overlap.max(1)
+        best_default, best_default_idx = overlap.max(0)
+
+        defaults_mask = best_target > threshhold
+
+        matched_targets[defaults_mask] = best_target_idx[defaults_mask]
+        matched_targets.index_copy_(
+            0, best_default_idx, torch.arange(0, truths.size(0))
+        )
+        return matched_targets
+
+    import matplotlib.pyplot as plt
+
+    root = Path('/Users/fredrikg/Pictures/pollen_astma/')
+    transform = SSDAugmentation(train=False)
+    dataset = AstmaDataset(root, 'balanced', 'train', transform)
+
+    model = make_ssd(phase='train', num_classes=len(dataset.labels) + 1)
+    defaults = model.priors.transpose(0, 1)
+
+    total_matches = torch.zeros(defaults.size(0)).int()
+    bins = [0, 5776, 2166, 600, 150, 36, 4]
+    steps = np.cumsum(bins)
+    model.eval()
+    for i in tqdm(range(len(dataset))):
+        try:
+            _, truth = dataset[i]
+        except ValueError:
+            continue
+        matches = match(defaults, truth[:, :4], 0.5)
+        total_matches += matches.ge(0).int()
+
+    totals = [
+        total_matches[n:m].sum().item() for n, m in list(zip(steps[:-1], steps[1:]))
+    ]
+
+    print(totals)
 
 
 def test_encoder(name):
@@ -150,15 +216,15 @@ def test_encoder(name):
     img = Image.open(p / name)
     trans = SSDAugmentation(train=False)
     denorm = DeNormalize()
-    m = make_ssd()
+    model = make_ssd()
 
     img, boxes, label = trans(img, boxes, torch.ones(boxes.size(0)))
     img, *_ = denorm(img, None, None)
-    target_box, target_label = encode(m.priors, boxes, label)
+    target_box, target_label = encode(model.priors, boxes, label)
     pos = target_label > 0
     target_box = point_form(target_box.T[pos])
 
-    defaults = point_form(m.priors[pos])
+    defaults = point_form(model.priors[pos])
 
     chosen, chosen_idx = target_label.sort(descending=True)
     cpos = chosen > 0
@@ -191,8 +257,8 @@ def test_crit(names):
     from model.utils.geometry import point_form
 
     batch_size = len(names)
-    ssd_net = make_ssd()
-    criterion = MultiBoxLoss(ssd_net.priors, batch_size)
+    model = make_ssd()
+    criterion = MultiBoxLoss(model.priors, batch_size)
     p = Path('/Users/fredrikg/Projects/pollendb1/data/train')
     trf = Path('/Users/fredrikg/Projects/pollendb1/data/annotations/train_bboxes.pkl')
     train_labels = pickle.load(trf.open('rb'))
@@ -206,7 +272,7 @@ def test_crit(names):
             train_labels[n],
             torch.ones(train_labels[n].size(0)),
         )
-        tb, tl = encode(ssd_net.priors, b, la)
+        tb, tl = encode(model.priors, b, la)
         ims.append(i)
         boxes.append(tb)
         labels.append(tl)
@@ -215,7 +281,7 @@ def test_crit(names):
     print(gloc.size())
     glabel = torch.stack(labels, dim=0).long()
 
-    ploc, pconf = ssd_net(images)
+    ploc, pconf = model(images)
 
     loss = criterion(ploc, pconf, gloc, glabel)
     print(loss.item())
@@ -226,6 +292,8 @@ if __name__ == "__main__":
     # data_pipeline()
     # run_model()
     infer()  # '0034_076.jpg' '0063_131.jpg'
+    # run_model()
+    # test_decoder()
     # test_encoder('0056_112.jpg')
     # test_crit(['0114_171.jpg', '0403_055.jpg', '0090_108.jpg'])
     # evaluate_model()
