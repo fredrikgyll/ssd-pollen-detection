@@ -24,7 +24,7 @@ def priors() -> torch.Tensor:
     steps = [8, 16, 32, 64, 100, 300]
     # use the scales here:
     # https://github.com/amdegroot/ssd.pytorch/blob/master/data/config.py
-    scales = [21, 45, 99, 153, 207, 261, 315]
+    scales = [45, 70, 99, 153, 207, 261, 315]
     aspect_ratios = [[2], [2, 3], [2, 3], [2, 3], [2], [2]]
     fk = fig_size / np.array(steps)
     locations = []
