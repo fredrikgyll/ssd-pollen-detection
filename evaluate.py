@@ -94,3 +94,4 @@ if __name__ == "__main__":
 
     metrics = evaluate(model, dataset, CLASSES, quiet=False)
     args.output.write_bytes(pickle.dumps(metrics))
+    print(f'mAP: {calc_map(metrics, CLASSES):.2%}')

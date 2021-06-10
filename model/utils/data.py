@@ -6,6 +6,7 @@ import cv2
 import h5py
 import numpy as np
 import torch
+from icecream import ic
 
 
 class Pollene1Dataset:
@@ -56,10 +57,8 @@ class HDF5Dataset:
         target = self.annotations.get(file)[()]
 
         target = target.astype(float)
-        target = target[target[:, 4] != 3, :]
         labels = np.stack((target[:, 4], np.arange(target.shape[0])), 1)
-        im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
-
+        im, bboxes, labels = self.transform(img, target[:, :4], labels)
         target = torch.hstack((bboxes, labels))
         return im, target
 
@@ -84,7 +83,6 @@ class AstmaDataset:
         target = self.bboxes[file]
         target = target.astype(float)
         target[:, :4] /= 2
-        # target = target[target[:, 4] != 3, ...]
 
         labels = np.stack((target[:, 4], np.arange(target.shape[0])), 1)
 

@@ -40,7 +40,7 @@ def calculate_true_positives(
     :rtype: `torch.Tensor`
     """
     iou = jaccard(detections, ground_truths)
-    tps = torch.full(detections.size(0), -1, dtype=int)
+    tps = torch.full((detections.size(0),), -1, dtype=int)
     for i, ground_column in enumerate(iou.split(1, 1)):
         tp = torch.nonzero(ground_column.squeeze(-1) > 0.5).squeeze(-1)
         if tp.nelement() > 0:
@@ -110,9 +110,12 @@ def evaluate(model, dataset, class_subset, quiet=True):
     for cls in predictions.values():
         for example in cls:
             tp = example['tps'].ge(0)
+            gt_id = example['tps'][tp]
             file = example['file']
-            for conf, gid in zip(example['confs'][tp], example['truth_idx'][tp]):
-                table.append([file, gid, conf])
+            if not example['truth_idx'].nelement():
+                continue
+            for conf, gid in zip(example['confs'][tp], example['truth_idx'][gt_id]):
+                table.append([file, gid.int().item(), conf.item()])
 
     metrics['gt_table'] = table
     return metrics
