@@ -178,78 +178,16 @@ def rescale_batch(
     return ploc, F.softmax(pconf, dim=2)
 
 
-# Original author: Francisco Massa:
-# https://github.com/fmassa/object-detection.torch
-# Ported to PyTorch by Max deGroot (02/01/2017)
-def nms(boxes, scores, overlap=0.5, top_k=200):
-    """Apply non-maximum suppression at test time to avoid detecting too many
-    overlapping bounding boxes for a given object.
-    Args:
-        boxes: (tensor) The location preds for the img, Shape: [num_priors,4].
-        scores: (tensor) The class predscores for the img, Shape:[num_priors].
-        overlap: (float) The overlap thresh for suppressing unnecessary boxes.
-        top_k: (int) The Maximum number of box preds to consider.
-    Return:
-        The indices of the kept boxes with respect to num_priors.
+def nms(boxes: Tensor, scores: Tensor, overlap=0.5, top_k=200):
+    """Apply Non-maximum Suppression to boxes based on score value
+    :param boxes: (tensor) The location preds for the img, Shape: [num_priors,4].
+    :param scores: (tensor) The class predscores for the img, Shape:[num_priors].
+    :param overlap: (float) The overlap thresh for suppressing unnecessary boxes.
+    :param top_k: (int) The Maximum number of box preds to consider.
+    :returns: The indices of the kept boxes with respect to num_priors.
     """
-
-    keep = scores.new(scores.size(0)).zero_().long()
-    if boxes.numel() == 0:
-        return keep
-    x1 = boxes[:, 0]
-    y1 = boxes[:, 1]
-    x2 = boxes[:, 2]
-    y2 = boxes[:, 3]
-    area = torch.mul(x2 - x1, y2 - y1)
-    v, idx = scores.sort(0)  # sort in ascending order
-    # I = I[v >= 0.01]
-    idx = idx[-top_k:]  # indices of the top-k largest vals
-    xx1 = boxes.new()
-    yy1 = boxes.new()
-    xx2 = boxes.new()
-    yy2 = boxes.new()
-    w = boxes.new()
-    h = boxes.new()
-
-    # keep = torch.Tensor()
-    count = 0
-    while idx.numel() > 0:
-        i = idx[-1]  # index of current largest val
-        # keep.append(i)
-        keep[count] = i
-        count += 1
-        if idx.size(0) == 1:
-            break
-        idx = idx[:-1]  # remove kept element from view
-        # load bboxes of next highest vals
-        torch.index_select(x1, 0, idx, out=xx1)
-        torch.index_select(y1, 0, idx, out=yy1)
-        torch.index_select(x2, 0, idx, out=xx2)
-        torch.index_select(y2, 0, idx, out=yy2)
-        # store element-wise max with next highest score
-        xx1 = torch.clamp(xx1, min=x1[i])
-        yy1 = torch.clamp(yy1, min=y1[i])
-        xx2 = torch.clamp(xx2, max=x2[i])
-        yy2 = torch.clamp(yy2, max=y2[i])
-        w.resize_as_(xx2)
-        h.resize_as_(yy2)
-        w = xx2 - xx1
-        h = yy2 - yy1
-        # check sizes of xx1 and xx2.. after each iteration
-        w = torch.clamp(w, min=0.0)
-        h = torch.clamp(h, min=0.0)
-        inter = w * h
-        # IoU = i / (area(a) + area(b) - i)
-        rem_areas = torch.index_select(area, 0, idx)  # load remaining areas)
-        union = (rem_areas - inter) + area[i]
-        IoU = inter / union  # store result in iou
-        # keep only elements with an IoU <= overlap
-        idx = idx[IoU.le(overlap)]
-    return keep, count
-
-def nms3(boxes: Tensor, scores: Tensor, overlap=0.5, top_k=200):
     keep = []
-    
+
     sorted_scores, sorted_scores_idx = scores.sort(descending=True)
     mask = torch.ones_like(scores, dtype=bool)
     sorted_boxes = boxes[sorted_scores_idx]
@@ -263,88 +201,3 @@ def nms3(boxes: Tensor, scores: Tensor, overlap=0.5, top_k=200):
 
     keep = torch.tensor(keep)[:top_k]
     return keep, len(keep)
-
-def nms2(
-    bbox: Tensor,
-    prob: Tensor,
-    soft: bool,
-    iou_thr: float,
-    score_thr: float,
-    max_num: int,
-) -> Tensor:
-    out_boxes = []
-    out_labels = []
-    out_confs = []
-    for i, label_prob in enumerate(prob.split(1, 1)[1:]):
-        scores = label_prob.squeeze(1)
-        scores_sorted, scores_sorted_idx = scores.sort(dim=0, descending=True)
-        pre_mask = scores_sorted > score_thr
-        scores_sorted = scores_sorted[pre_mask][:max_num]
-        scores_sorted_idx = scores_sorted_idx[pre_mask][:max_num]
-
-        # return bbox[scores_sorted_idx[:100]], 0, 0 # Get all top boxes
-        picks = []
-        while scores_sorted_idx.numel():
-            chosen_idx = scores_sorted_idx[0]
-            chosen = bbox[chosen_idx].unsqueeze(0)
-            picks.append(chosen_idx.item())
-            iou = jaccard(chosen, bbox[scores_sorted_idx]).squeeze()
-            iou_mask = iou > iou_thr
-            if soft:
-                scores_sorted[iou_mask] *= 1 - iou[iou_mask]
-                score_mask = scores_sorted > score_thr
-                scores_sorted_idx = scores_sorted_idx[score_mask]
-                scores_sorted = scores_sorted[score_mask]
-                _, new_order = scores_sorted.sort(dim=0, descending=True)
-                scores_sorted_idx = scores_sorted_idx[new_order]
-            else:
-                scores_sorted_idx = scores_sorted_idx[~iou_mask]
-
-        out_boxes.append(bbox[picks, :])
-        out_confs.append(scores[picks])
-        out_labels.extend([i + 1] * len(picks))
-
-    if not out_boxes:
-        return (torch.tensor([]) for _ in range(3))
-
-    out_boxes, out_confs, out_labels = (
-        torch.cat(out_boxes, 0),
-        torch.cat(out_confs, 0),
-        torch.tensor(out_labels, dtype=torch.long),
-    )
-
-    _, indexes = out_confs.sort(descending=True)
-    indexes = indexes[:max_num]
-    return (out_boxes[indexes, :], out_confs[indexes], out_labels[indexes])
-
-
-def decode(
-    defaults: Tensor,
-    ploc: Tensor,
-    pconf: Tensor,
-    variances: List,
-    soft: bool = True,
-    iou_thr: float = 0.5,
-    score_thr: float = 0.001,
-    max_num: int = 25,
-) -> Tensor:
-    """Transform the model output into bounding boxes and perform NMS on each image"""
-    bboxes, probs = rescale_batch(defaults, ploc, pconf, variances)
-
-    output_boxes = []
-    output_labels = []
-    output_cofs = []
-    for bbox, prob in zip(bboxes.split(1, dim=0), probs.split(1, dim=0)):
-        bbox = bbox.squeeze(0)
-        prob = prob.squeeze(0)[:, 1]
-        keep, count = nms(bbox, prob, 0.5, 10)
-        boxes = bbox[keep]
-        conf = prob[keep]
-        labels = torch.zeros_like(conf)
-        # output = decode_single(
-        # bbox, prob, criteria=iou_thr, max_output=max_num, max_num=50)
-
-        output_boxes.append(boxes)
-        output_cofs.append(conf)
-        output_labels.append(labels)
-    return (output_boxes, output_cofs, output_labels)
