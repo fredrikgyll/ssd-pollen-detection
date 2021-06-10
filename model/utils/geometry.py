@@ -1,14 +1,11 @@
 """Helper functions for bounding box calculations"""
-from typing import Tuple, Dict, Any, Union, List
+from typing import Tuple
 
 import torch
 from torch import Tensor
-from torch.nn import Module
-import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
-from torch.nn.functional import softmax
-from torch.nn.modules.activation import Threshold
+
+from typing import List
 
 
 def point_form(boxes: Tensor):
@@ -152,7 +149,7 @@ def encode(
     matched_targets.index_copy_(0, best_default_idx, torch.arange(0, truths.size(0)))
 
     labels_out = torch.zeros(defaults.size(0)).int()
-    boxes_out = torch.zeros(defaults.size()).float()
+    boxes_out = defaults.clone()
     pos_mask = matched_targets.ge(0)
     # print(f'positive boxes: {pos_mask.sum()}')
     labels_out[pos_mask] = labels[matched_targets[pos_mask]].int()
@@ -161,7 +158,7 @@ def encode(
 
 
 def rescale_batch(
-    defaults: Tensor, ploc: Tensor, pconf: Tensor
+    defaults: Tensor, ploc: Tensor, pconf: Tensor, variances: List
 ) -> Tuple[Tensor, Tensor]:
     ploc = ploc.permute(0, 2, 1)  # (N, nboxes, 4)
     pconf = pconf.permute(0, 2, 1)  # (N, nboxes, nclasses)
@@ -169,23 +166,14 @@ def rescale_batch(
     # ploc has offsets relative to the default boxcoordinates so must be transformed
     # to actual bounding boxes
 
+    ploc[:, :, :2] = ploc[:, :, :2] * defaults[:, 2:] * variances[0] + defaults[:, :2]
+    ploc[:, :, 2:] = (ploc[:, :, 2:] * variances[1]).exp() * defaults[:, 2:]
 
-    ploc[:, :, :2] = ploc[:, :, :2] * defaults[:, 2:] + defaults[:, :2]
-    ploc[:, :, 2:] = ploc[:, :, 2:].exp() * defaults[:, 2:]
-
-    # ploc = torch.cat((ploc[:, :, :2] - 0.5 *ploc[:, :, 2:],ploc[:, :, :2] + ploc[:, :, 2:]),dim=2)
-    
-    l, t, r, b = (ploc[:, :, 0] - 0.5*ploc[:, :, 2],
-                     ploc[:, :, 1] - 0.5*ploc[:, :, 3],
-                     ploc[:, :, 0] + 0.5*ploc[:, :, 2],
-                     ploc[:, :, 1] + 0.5*ploc[:, :, 3])
-
-    ploc[:, :, 0] = l
-    ploc[:, :, 1] = t
-    ploc[:, :, 2] = r
-    ploc[:, :, 3] = b
+    ploc[:, :, :2] -= ploc[:, :, 2:] / 2
+    ploc[:, :, 2:] += ploc[:, :, :2]
 
     return ploc, F.softmax(pconf, dim=2)
+    
 
 def nms(
     bbox: Tensor,
@@ -201,16 +189,20 @@ def nms(
     for i, label_prob in enumerate(prob.split(1, 1)[1:]):
         scores = label_prob.squeeze(1)
         scores_sorted, scores_sorted_idx = scores.sort(dim=0, descending=True)
+        pre_mask = scores_sorted > score_thr
+        scores_sorted = scores_sorted[pre_mask][:max_num]
+        scores_sorted_idx = scores_sorted_idx[pre_mask][:max_num]
+
         # return bbox[scores_sorted_idx[:100]], 0, 0 # Get all top boxes
         picks = []
         while scores_sorted_idx.numel():
             chosen_idx = scores_sorted_idx[0]
             chosen = bbox[chosen_idx].unsqueeze(0)
-            picks.append(chosen_idx)
+            picks.append(chosen_idx.item())
             iou = jaccard(chosen, bbox[scores_sorted_idx]).squeeze()
             iou_mask = iou > iou_thr
             if soft:
-                scores_sorted[iou_mask] *= 1-scores_sorted[iou_mask]
+                scores_sorted[iou_mask] *= 1 - iou[iou_mask]
                 score_mask = scores_sorted > score_thr
                 scores_sorted_idx = scores_sorted_idx[score_mask]
                 scores_sorted = scores_sorted[score_mask]

@@ -9,7 +9,8 @@ def evaluate(model, data_loader, args):
     confidences = []
     predictions = []
     nr_gts = 0
-    for batch in data_loader:
+    for i, batch in enumerate(data_loader):
+        print(f'Batch {i:2d}')
         images, targets, labels = batch.data()
         if args.cuda:
             images = images.cuda()

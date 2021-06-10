@@ -43,5 +43,4 @@ def priors() -> torch.Tensor:
                 cx, cy = (j + 0.5) / fk[idx], (i + 0.5) / fk[idx]
                 locations.append((cx, cy, w, h))
     dboxes = torch.tensor(locations, dtype=torch.float)
-    dboxes.clamp_(min=0, max=1)
     return dboxes

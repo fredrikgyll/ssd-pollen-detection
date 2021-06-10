@@ -77,7 +77,9 @@ def train(args):
     )
 
     # Model init
-    cfg = dict(size=300, num_classes=2, default_boxes=[4, 6, 6, 6, 4, 4])
+    cfg = dict(
+        size=300, num_classes=2, default_boxes=[4, 6, 6, 6, 4, 4], variances=[0.1, 0.2]
+    )
     ssd_net = SSD(ResNet(backbone_path=args.weights), cfg)
     logger(f'Number of priors is {ssd_net.priors.size(0)}')
     logger(f'Number of extractor layers: {len(ssd_net.loc_head)+1}')
@@ -90,7 +92,7 @@ def train(args):
     )
     scheduler = MultiStepLR(optimizer=optimizer, milestones=args.multistep, gamma=0.1)
 
-    criterion = MultiBoxLoss(ssd_net.priors, batch_size)
+    criterion = MultiBoxLoss(ssd_net.priors, cfg['variances'], batch_size)
     if args.cuda:
         ssd_net = ssd_net.cuda()
         criterion = criterion.cuda()
