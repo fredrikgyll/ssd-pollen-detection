@@ -26,11 +26,38 @@ def load_run_metrics(root: Path):
     return metrics
 
 
+def run_metrics(checkpoints, datasets, class_subset, quiet=True):
+    points = [int(f.stem.lstrip('ssd_')) for f in checkpoints]
+
+    init_state = torch.load(checkpoints[0], map_location=torch.device('cuda'))
+
+    cfg = dict(
+        size=init_state['size'],
+        num_classes=init_state['num_classes'],
+        layer_activation=init_state['layer_activations'],
+        default_boxes=init_state['default_boxes'],
+        variances=[0.1, 0.2],
+    )
+    model = make_ssd(
+        phase='test', backbone=init_state.get('backbone', 'resnet34'), cfg=cfg
+    )
+    model = model.cuda()
+
+    metrics = []
+    for i, file in enumerate(checkpoints):
+        print(f'[{i+1:2d}/{len(checkpoints)}] {file.stem}')
+        state = torch.load(file, map_location=torch.device('cuda'))
+        model.load_state_dict(state['model_state_dict'], strict=True)
+        metrics.append(
+            [evaluate(model, dst, class_subset, quiet=quiet) for dst in datasets]
+        )
+
+    metrics = list(zip(*metrics))
+    return points, metrics
+
+
 def evaluate_run(run_dir: Path, data_root: Path, class_subset, quiet=True):
     checkpoints = list(run_dir.glob('ssd_*.pth'))
-    points = np.array([int(f.stem.lstrip('ssd_')) for f in checkpoints])
-
-    maps = []
 
     transforms = SSDAugmentation(train=False)
     test_dataset = HDF5Dataset(data_root, 'balanced1', 'test', transforms)
@@ -38,21 +65,13 @@ def evaluate_run(run_dir: Path, data_root: Path, class_subset, quiet=True):
 
     datasets = [test_dataset, train_dataset]
 
-    model = make_ssd(phase='test', num_classes=len(train_dataset.labels) + 1)
-    model = model.cuda()
-
-    for i, file in enumerate(checkpoints):
-        not quiet and print(f'[{i+1:2d}/{len(checkpoints)}] {file.stem}')
-        state = torch.load(file, map_location=torch.device('cuda'))
-        model.load_state_dict(state['model_state_dict'], strict=True)
-        metrics = [evaluate(model, dst, class_subset, quiet=quiet) for dst in datasets]
-        maps.append([calc_map(m, class_subset) for m in metrics])
-    test_map, train_map = list(zip(*maps))
-    test_map = np.array(test_map)
-    train_map = np.array(train_map)
+    iteration, metrics = run_metrics(checkpoints, datasets, class_subset, quiet=quiet)
+    points = np.array(iteration)
+    maps = [[calc_map(m, class_subset) for m in run] for run in metrics]
+    maps = [np.array(m) for m in maps]
 
     order_idx = np.argsort(points)
-    return points[order_idx], test_map[order_idx], train_map[order_idx]
+    return points[order_idx], maps[0][order_idx], maps[1][order_idx]
 
 
 if __name__ == "__main__":
