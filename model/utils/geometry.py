@@ -160,24 +160,6 @@ def encode(
     return boxes_out.transpose(0, 1), labels_out
 
 
-def rescale_batch(
-    defaults: Tensor, ploc: Tensor, pconf: Tensor, variances: List
-) -> Tuple[Tensor, Tensor]:
-    # ploc = ploc.permute(0, 2, 1)  # (N, nboxes, 4)
-    # pconf = pconf.permute(0, 2, 1)  # (N, nboxes, nclasses)
-
-    # ploc has offsets relative to the default boxcoordinates so must be transformed
-    # to actual bounding boxes
-
-    ploc[:, :, :2] = ploc[:, :, :2] * defaults[:, 2:] * variances[0] + defaults[:, :2]
-    ploc[:, :, 2:] = (ploc[:, :, 2:] * variances[1]).exp() * defaults[:, 2:]
-
-    ploc[:, :, :2] -= ploc[:, :, 2:] / 2
-    ploc[:, :, 2:] += ploc[:, :, :2]
-
-    return ploc, F.softmax(pconf, dim=2)
-
-
 def nms(boxes: Tensor, scores: Tensor, overlap=0.5, top_k=200):
     """Apply Non-maximum Suppression to boxes based on score value
     :param boxes: (tensor) The location preds for the img, Shape: [num_priors,4].
@@ -199,5 +181,28 @@ def nms(boxes: Tensor, scores: Tensor, overlap=0.5, top_k=200):
         iou_mask = iou.le(overlap)
         mask &= iou_mask
 
+    keep = torch.tensor(keep)[:top_k]
+    return keep, len(keep)
+
+
+def soft_nms(boxes: Tensor, scores: Tensor, overlap=0.5, top_k=200):
+    keep = []
+    
+    sorted_scores, sorted_scores_idx = scores.sort(descending=True)
+    mask = torch.ones_like(scores, dtype=bool)
+    sorted_boxes = boxes[sorted_scores_idx]
+
+    while mask.any():
+        keep.append(sorted_scores_idx[mask][0].item())
+        selected = boxes[keep[-1]]
+        iou = jaccard(selected.unsqueeze(0), sorted_boxes).squeeze()
+
+        iou_mask = iou.ge(overlap)
+        sorted_scores[iou_mask] *= (1 - iou[iou_mask])
+        
+        sorted_scores, resorting_idx = sorted_scores.sort(descending=True)
+        sorted_scores_idx = sorted_scores_idx[resorting_idx]
+        mask = mask[resorting_idx]
+    
     keep = torch.tensor(keep)[:top_k]
     return keep, len(keep)
