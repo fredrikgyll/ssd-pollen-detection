@@ -9,38 +9,12 @@ import torch
 from icecream import ic
 
 
-class Pollene1Dataset:
-    def __init__(self, root: Path, mode: str, transform) -> None:
-        self.transform = transform
-        self.bboxes = pickle.load((root / f'annotations/new/{mode}.pkl').open('rb'))
-        self.image_dir = root / mode
-        self.images = list(sorted(self.bboxes.keys()))
-        self.labels = ['pollen']
-        # self.dims = np.array([640, 512, 640, 512])
-
-    def __getitem__(self, idx):
-        file = self.images[idx]
-        img = cv2.imread(str(self.image_dir / file))
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-        target = self.bboxes[file]
-        target = target.astype(float)
-        # target[:, :4] /= self.dims
-
-        im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
-
-        target = torch.hstack((bboxes, labels.unsqueeze(1)))
-        return im, target
-
-    def __len__(self):
-        return len(self.images)
-
-
 class HDF5Dataset:
-    def __init__(self, root: Path, dataset: str, mode: str, transform) -> None:
+    def __init__(self, root: Path, dataset: str, mode: str, transform, sharpness_bound = None) -> None:
         self.transform = transform
         self.data_file = root
         self.labels = ['poaceae', 'corylus', 'alnus']
+        self.sharpness_bound = sharpness_bound or [0, 1]
         with h5py.File(self.data_file, 'r') as f:
             self.names = f[f'datasets/{dataset}/{mode}'][()]
 
@@ -48,6 +22,7 @@ class HDF5Dataset:
         self.dataset = h5py.File(self.data_file, 'r')
         self.images = self.dataset['images@2x']
         self.annotations = self.dataset['annotations@2x']
+        self.sharpness = self.dataset['sharpness']
 
     def __getitem__(self, idx):
         if not hasattr(self, 'dataset'):
@@ -55,9 +30,15 @@ class HDF5Dataset:
         file = self.names[idx]
         img = self.images.get(file)[()]
         target = self.annotations.get(file)[()]
+        if self.sharpness_bound:
+            target_msk = (target > self.sharpness_bound[0]) & (target < self.sharpness_bound[1])
+            target = self.annotations.get(file)[target_msk]
+            target_ids = np.flatnonzero(target_msk)
+        else:
+            target_ids = np.arange(target.shape[0])
 
         target = target.astype(float)
-        labels = np.stack((target[:, 4], np.arange(target.shape[0])), 1)
+        labels = np.stack((target[:, 4], target_ids), 1)
         im, bboxes, labels = self.transform(img, target[:, :4], labels)
         target = torch.hstack((bboxes, labels))
         return im, target

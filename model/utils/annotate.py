@@ -82,10 +82,13 @@ def annotate_detection(image, targets, detections, class_list, name='', save=Non
         # 'bbox': text_box
     }
     rect_conf = {'fill': False, 'lw': 1.0, 'ls': '-'}
-    plt.imshow(img)
-    ax = plt.gca()
-    plt.title(name)
+
+    fig = plt.figure(figsize=(4, 4))
+    ax = plt.Axes(fig, [0.0, 0.0, 1.0, 1.0])
     ax.set_axis_off()
+    fig.add_axes(ax)
+    ax.imshow(img)
+
     for box in boxes:
         color = colors[box['key']]
         plt_point = _points(*box['box'])
@@ -94,6 +97,37 @@ def annotate_detection(image, targets, detections, class_list, name='', save=Non
             org = offsets[box['key']](*plt_point)
             ax.text(*org, box['label'], color=color, **text_conf)
     if save:
-        plt.savefig(save)
+        plt.savefig(save, dpi=100)
+        plt.close()
     else:
         plt.show()
+
+
+def _ann_box(annotation, class_list):
+    bbox = annotation[:4]
+    box = bbox[:2], bbox[2:] - bbox[:2]
+    return {'box': box, 'cls': class_list[annotation[4]]}
+
+
+def annotate_gt(ax, img, annotations, class_list, with_labels=False):
+    boxes = [_ann_box(b, class_list) for b in annotations]
+
+    colors = {
+        'poaceae': '#1f77b4',
+        'corylus': '#ff7f0e',
+        'alnus': '#2ca02c',
+    }
+    text_conf = {
+        'horizontalalignment': 'center',
+        'verticalalignment': 'center',
+        'size': 10,
+        # 'bbox': text_box
+    }
+    rect_conf = {'fill': False, 'lw': 0.2, 'ls': '-'}
+    ax.imshow(img)
+    for box in boxes:
+        c = colors[box['cls']]
+        plt_point = _points(*box['box'])
+        ax.add_patch(patches.Rectangle(*plt_point, color=c, **rect_conf))
+        if with_labels:
+            ax.text(plt_point[0], box['cls'], color=c, **text_conf)

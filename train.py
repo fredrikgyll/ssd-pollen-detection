@@ -220,7 +220,8 @@ if __name__ == "__main__":
     root = args.data
     batch_size = args.batch_size
     transforms = SSDAugmentation()
-    dataset = HDF5Dataset(root, 'balanced1', 'train', transforms)
+    # bounds [0.0228, 0.0431]
+    dataset = HDF5Dataset(root, 'balanced1', 'train', transforms, sharpness_bound=[0,1])
     data_loader = data.DataLoader(
         dataset,
         batch_size=batch_size,
