@@ -7,9 +7,9 @@ from pathlib import Path
 import numpy as np
 import torch
 from cv2 import data
-from tqdm.auto import tqdm
-
+from icecream import ic
 from ssd import make_ssd
+from tqdm.auto import tqdm
 from utils.augmentations import SSDAugmentation
 from utils.data import HDF5Dataset
 from utils.geometry import jaccard
@@ -55,14 +55,14 @@ if __name__ == "__main__":
                 targets = targets.cuda()
             detections = model(image.unsqueeze(0))
             for j, name in enumerate(CLASSES):
-                truth = targets[targets[4] == j, :4]
+                truth = targets[targets[:, 4] == j, :4]
                 n_gth[name] += len(truth)
                 dets = detections[0, j + 1, ...]  # 0 is bkg_label
                 mask = dets[:, 0].gt(0.0)
                 if mask.any():
                     dets = dets[mask, ...]
                     sorted_conf, order_idx = dets[:, 0].sort(descending=True)
-                    iou = jaccard(dets[order_idx, :4], truth)
+                    iou = jaccard(dets[order_idx, 1:], truth)
                     preds = torch.zeros(dets.size(0))
 
                     for ground_column in iou.split(1, 1):
@@ -71,15 +71,16 @@ if __name__ == "__main__":
                             preds[tp[0]] = 1
                     predictions[name].append(preds)
                     confidences[name].append(sorted_conf)
-    precision = {}
-    recall = {}
+    out = {}
     for name in CLASSES:
         preds = torch.cat(predictions[name], dim=0)
         confs = torch.cat(confidences[name], dim=0)
         _, order = confs.sort(descending=True)
         preds = torch.cumsum(preds[order], dim=0).cpu().numpy()
-        precision[name] = preds / np.arange(1, preds.size() + 1)
-        recall[name] = preds / n_gth[name]
 
-    out = {'precision': precision, 'recall': recall}
+        out[name] = {
+            'precision': preds / np.arange(1, preds.size + 1),
+            'recall': preds / n_gth[name],
+        }
+
     (args.output / 'map.pkl').write_bytes(pickle.dumps(out))

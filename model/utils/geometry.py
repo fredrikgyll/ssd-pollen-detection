@@ -1,11 +1,9 @@
 """Helper functions for bounding box calculations"""
-from typing import Tuple
+from typing import List, Tuple
 
 import torch
-from torch import Tensor
 import torch.nn.functional as F
-
-from typing import List
+from torch import Tensor
 
 
 def point_form(boxes: Tensor):
@@ -75,6 +73,7 @@ def intersect(boxes_a: Tensor, boxes_b: Tensor) -> Tensor:
     inter = torch.clamp((max_xy - min_xy), min=0)
     return inter[:, :, 0] * inter[:, :, 1]
 
+
 def area(boxes: Tensor) -> Tensor:
     """Return Tensor of areas of each box
 
@@ -84,7 +83,8 @@ def area(boxes: Tensor) -> Tensor:
     :return: Tensor of area values in [0,1]
     :rtype: Tensor[boxes.size]
     """
-    return ((boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1]))
+    return (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+
 
 def jaccard(boxes_a: Tensor, boxes_b: Tensor) -> Tensor:
     """Return jaccard overlap (IoU) of boxes in boxes_a and boxes_b
@@ -107,9 +107,9 @@ def jaccard(boxes_a: Tensor, boxes_b: Tensor) -> Tensor:
     # unsqueze so we can combine them with intersection.
     # boxes_a is expanded so each row is a copy of the areas
     # boxes_b is expanded so every column is a copy of the areas
-    areas_a = area(boxes_a).unsqueeze(1).expand_as(inter) # [A,B]
-    areas_b = area(boxes_b).unsqueeze(0).expand_as(inter) # [A,B]
-    
+    areas_a = area(boxes_a).unsqueeze(1).expand_as(inter)  # [A,B]
+    areas_b = area(boxes_b).unsqueeze(0).expand_as(inter)  # [A,B]
+
     union = areas_a + areas_b - inter
     return inter / union  # [A,B]
 

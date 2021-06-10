@@ -1,17 +1,17 @@
 """modified from https://github.com/Cartucho/mAP"""
+import argparse
 import glob
 import json
+import math
+import operator
 import os
 import shutil
-import operator
 import sys
-import argparse
-import math
-import cv2
-
 from pathlib import Path
-import numpy as np
+
+import cv2
 import matplotlib.pyplot as plt
+import numpy as np
 
 MINOVERLAP = 0.5  # default value (defined in the PASCAL VOC2012 challenge)
 
@@ -506,7 +506,7 @@ with open(output_files_path / "output.txt", "w") as output_file:
 
 
 # remove the temp_files directory
-shutil.rmtree(TEMP_FILES_PATH)
+# shutil.rmtree(TEMP_FILES_PATH)
 
 """
  Count total of detection-results

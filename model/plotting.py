@@ -1,5 +1,5 @@
-from visdom import Visdom
 import numpy as np
+from visdom import Visdom
 
 
 class VisdomLinePlotter(object):

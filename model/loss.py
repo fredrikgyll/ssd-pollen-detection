@@ -1,9 +1,9 @@
+from typing import List
+
 import torch
 import torch.nn as nn
 
-from typing import List
-
-from utils.geometry import encode
+from model.utils.geometry import encode
 
 
 class MultiBoxLoss(nn.Module):

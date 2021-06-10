@@ -1,14 +1,14 @@
-from typing import Tuple, Dict, Any, List
-from numpy.lib.utils import source
+from typing import Any, Dict, List, Tuple
 
 import torch
-from torch import Tensor
 import torch.nn as nn
 import torch.nn.functional as F
+from numpy.lib.utils import source
+from torch import Tensor
 from torchvision.models.resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 
-from priors import PriorBox
-from utils.detection import Detect
+from model.priors import PriorBox
+from model.utils.detection import Detect
 
 Modules = List[nn.Module]
 
@@ -93,13 +93,13 @@ class SSD(nn.Module):
         if phase == 'test':
             self.softmax = nn.Softmax(dim=-1)
             self.detect = Detect(
-                num_classes=self.num_classes, 
-                bkg_label=0, 
-                top_k=50, 
+                num_classes=self.num_classes,
+                bkg_label=0,
+                top_k=50,
                 area_thresh=0.1,
-                conf_thresh=0.1, 
-                nms_thresh=0.45, 
-                variances=cfg['variances']
+                conf_thresh=0.1,
+                nms_thresh=0.45,
+                variances=cfg['variances'],
             )
 
     def _init_weights(self):

@@ -1,6 +1,7 @@
-import requests
 import shutil
 from pathlib import Path
+
+import requests
 
 
 class CDNConnector:
@@ -81,7 +82,7 @@ class CDNConnector:
 
         with file_path.open("rb") as file:
             response = s.put(request_url, data=file)
-        
+
         response.raise_for_status()
 
         return response.json()

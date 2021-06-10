@@ -1,7 +1,7 @@
 import torch
 from icecream import ic
 
-from .geometry import nms, area
+from model.utils.geometry import area, nms
 
 
 # Adapted from https://github.com/Hakuyume/chainer-ssd
@@ -38,7 +38,14 @@ class Detect:
     """
 
     def __init__(
-        self, num_classes, bkg_label, top_k, area_thresh, conf_thresh, nms_thresh, variances
+        self,
+        num_classes,
+        bkg_label,
+        top_k,
+        area_thresh,
+        conf_thresh,
+        nms_thresh,
+        variances,
     ):
         self.num_classes = num_classes
         self.background_label = bkg_label
@@ -63,7 +70,9 @@ class Detect:
         """
         num = loc_data.size(0)  # batch size
         num_priors = prior_data.size(0)
-        output = torch.zeros(num, self.num_classes, self.top_k, 5)
+        output = torch.zeros(
+            num, self.num_classes, self.top_k, 5, device=conf_data.device
+        )
         conf_preds = conf_data.view(num, num_priors, self.num_classes).transpose(2, 1)
 
         # Decode predictions into bboxes.
@@ -74,7 +83,7 @@ class Detect:
             area_mask = areas.lt(self.area_thresh)
             # For each class, perform nms
             conf_scores = conf_preds[i].clone()
-                
+
             for cl in range(1, self.num_classes):
                 c_mask = conf_scores[cl].gt(self.conf_thresh) & area_mask
                 scores = conf_scores[cl][c_mask]

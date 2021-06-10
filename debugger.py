@@ -1,26 +1,25 @@
+import pickle
 from collections import namedtuple
+from pathlib import Path
+
+import numpy as np
 import torch
+from PIL import Image
 from torch.utils.data.dataloader import DataLoader
 from torchvision.transforms.functional import to_pil_image
-import numpy as np
-from pathlib import Path
-from PIL import Image
-import pickle
-from evaluate import evaluate
-from priors.priors import PriorBox
-from ssd import make_ssd
-from utils.augmentations import SSDAugmentation
 
-from utils.augmentations import DeNormalize
-from utils.data import Pollene1Dataset, collate, AstmaDataset
+from model.evaluate import evaluate
+from model.priors.priors import PriorBox
+from model.ssd import make_ssd
+from model.utils.augmentations import DeNormalize, SSDAugmentation
+from model.utils.data import AstmaDataset, Pollene1Dataset, collate
 
-model_name = '2021-03-31T16-21-01'
+model_name = '2021-03-31T18-40-08'
 model_ch = Path('/Users/fredrikg/Projects/pollendb1/saves') / f'{model_name}.pth'
 
 
 def run_model():
-    from ssd import make_ssd
-    from utils import decode
+    from model.utils import decode
 
     m = make_ssd()
     x = torch.randn(2, 3, 300, 300)
@@ -29,7 +28,7 @@ def run_model():
 
 
 def run_subsampler(name):
-    from utils.augmentations import SubSample
+    from model.utils.augmentations import SubSample
 
     root = Path('/Users/fredrikg/Projects/pollendb1/data')
     trf = root / 'annotations/train_labels.pkl'
@@ -53,9 +52,10 @@ def to_plt_img(image):
 
 
 def show_img(name):
-    import matplotlib.pyplot as plt
     import matplotlib.patches as patches
-    import utils.augmentations as aug
+    import matplotlib.pyplot as plt
+
+    import model.utils.augmentations as aug
 
     p = Path('/Users/fredrikg/Projects/pollendb1/data/train')
     trf = Path('/Users/fredrikg/Projects/pollendb1/data/annotations/train_labels.pkl')
@@ -98,7 +98,7 @@ def show_img(name):
 
 
 def data_pipeline():
-    from utils.data import Pollene1Dataset, collate
+    from model.utils.data import Pollene1Dataset, collate
 
     root = Path('/Users/fredrikg/Projects/pollendb1/data')
     transform = SSDAugmentation()
@@ -114,7 +114,7 @@ def data_pipeline():
 
 
 def evaluate_model():
-    import matplotlib.pyplot as plt
+    import model.matplotlib.pyplot as plt
 
     model = make_ssd()
     model_state = torch.load(model_ch, map_location=torch.device('cpu'))
@@ -143,11 +143,11 @@ def evaluate_model():
 
 
 def infer(name):
-    from ssd import make_ssd
-    from utils.geometry import decode
-    from utils.augmentations import get_transform, DeNormalize
-    import matplotlib.pyplot as plt
     import matplotlib.patches as patches
+    import matplotlib.pyplot as plt
+
+    from model.utils.augmentations import DeNormalize, get_transform
+    from model.utils.geometry import decode
 
     dim = 300
     model = make_ssd()
@@ -186,10 +186,10 @@ def infer(name):
 
 
 def infer2():
-    from ssd import make_ssd
-    from utils.augmentations import DeNormalize
-    import matplotlib.pyplot as plt
     import matplotlib.patches as patches
+    import matplotlib.pyplot as plt
+
+    from model.utils.augmentations import DeNormalize
 
     root = Path('/Users/fredrikg/Pictures/pollen_astma/')
     transform = SSDAugmentation(train=False)
@@ -203,10 +203,10 @@ def infer2():
     }
 
     dim = 300
-    model = make_ssd(phase='test', num_classes=len(dataset.labels)+1)
+    model = make_ssd(phase='test', num_classes=len(dataset.labels) + 1)
     model_state = torch.load(model_ch, map_location=torch.device('cpu'))
     model.load_state_dict(model_state, strict=False)
-    
+
     lens = [len(dataset.bboxes[n]) for n in dataset.images]
     sorted = np.argsort(lens)[::-1]
 
@@ -218,7 +218,7 @@ def infer2():
     with torch.no_grad():
         detections = model(img.unsqueeze(0))
     out = []
-    for i in [1,2,3]:
+    for i in [1, 2, 3]:
         dets = detections[0, i, ...]  # only one class which is nr. 1
         mask = dets[:, 0].gt(0.2)
         dets = dets[mask, ...]
@@ -236,30 +236,29 @@ def infer2():
     # ax.set_title('Subsample')
 
     offsets = {
-        'gt': lambda xy,w,h: (xy[0]+(w//2), xy[1]+(h//2)),
-        'poaceae': lambda xy,w,h: (xy[0], xy[1]+h+10),
-        'corylus': lambda xy,w,h: (xy[0]+w, xy[1]),
-        'alnus': lambda xy,w,h: (xy[0]+w, xy[1]+h+10),
+        'gt': lambda xy, w, h: (xy[0] + (w // 2), xy[1] + (h // 2)),
+        'poaceae': lambda xy, w, h: (xy[0], xy[1] + h + 10),
+        'corylus': lambda xy, w, h: (xy[0] + w, xy[1]),
+        'alnus': lambda xy, w, h: (xy[0] + w, xy[1] + h + 10),
     }
-
 
     for (*xy, w, h), l in zip(boxes, labels.int()):
         ax.add_patch(patches.Rectangle(xy, w, h, edgecolor='green', fill=False))
-        ax.text(*offsets['gt'](xy,w,h), dataset.labels[l], color='green', fontsize=10)
+        ax.text(*offsets['gt'](xy, w, h), dataset.labels[l], color='green', fontsize=10)
     for l, boxes, confs in zip(dataset.labels, out_bbox, out_conf):
         for (*xy, w, h), c in zip(boxes, confs):
             ax.add_patch(patches.Rectangle(xy, w, h, edgecolor=colors[l], fill=False))
-            ax.text(*offsets[l](xy,w,h), f'{l} {c:.2f}', color=colors[l], fontsize=10)
+            ax.text(*offsets[l](xy, w, h), f'{l} {c:.2f}', color=colors[l], fontsize=10)
     ax.set_axis_off()
     plt.show()
 
 
 def test_encoder(name):
-    from ssd import make_ssd
-    from utils import encode
-    from utils.geometry import point_form
-    import matplotlib.pyplot as plt
     import matplotlib.patches as patches
+    import matplotlib.pyplot as plt
+
+    from model.utils import encode
+    from model.utils.geometry import point_form
 
     p = Path('/Users/fredrikg/Projects/pollendb1/data/train')
     trf = Path('/Users/fredrikg/Projects/pollendb1/data/annotations/train.pkl')
@@ -300,13 +299,13 @@ def test_encoder(name):
 
 
 def test_crit(names):
-    from ssd import make_ssd
-    from loss import MultiBoxLoss
-    from utils import encode
-    from utils.augmentations import get_transform
-    from utils.geometry import point_form
-    import matplotlib.pyplot as plt
     import matplotlib.patches as patches
+    import matplotlib.pyplot as plt
+
+    from model.loss import MultiBoxLoss
+    from model.utils import encode
+    from model.utils.augmentations import get_transform
+    from model.utils.geometry import point_form
 
     batch_size = len(names)
     ssd_net = make_ssd()

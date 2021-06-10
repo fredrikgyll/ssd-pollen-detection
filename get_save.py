@@ -1,7 +1,9 @@
-from model.utils.bunny import CDNConnector
-from pathlib import Path
-from dotenv import load_dotenv
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+from model.utils.bunny import CDNConnector
 
 load_dotenv()
 
@@ -14,7 +16,6 @@ list_files = [
     Path(obj['Path']) / obj['ObjectName']
     for obj in conn.get_storaged_objects('models/')
 ]
-
 
 
 print("Choose a number:")

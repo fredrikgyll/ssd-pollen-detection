@@ -1,25 +1,25 @@
-from contextlib import contextmanager
+import argparse
+import datetime
+import os
 import pickle
 import time
-import argparse
-import os
+from contextlib import contextmanager
 from pathlib import Path
-import datetime
-import numpy as np
 from pprint import pformat
-from dotenv import load_dotenv
 
+import numpy as np
 import torch
 import torch.utils.data as data
+from dotenv import load_dotenv
 from torch.optim import SGD
 from torch.optim.lr_scheduler import MultiStepLR
-from plotting import VisdomLinePlotter
 
-from ssd import ResNet, SSD
-from loss import MultiBoxLoss
-from utils.augmentations import SSDAugmentation
-from utils.data import HDF5Dataset, collate
-from utils.logger import Logger
+from model.loss import MultiBoxLoss
+from model.plotting import VisdomLinePlotter
+from model.ssd import SSD, ResNet
+from model.utils.augmentations import SSDAugmentation
+from model.utils.data import HDF5Dataset, collate
+from model.utils.logger import Logger
 
 parser = argparse.ArgumentParser(description='Train SSD300 model')
 parser.add_argument(
@@ -56,9 +56,7 @@ parser.add_argument(
     default=[40, 55],
     help='epochs at which to decay learning rate',
 )
-parser.add_argument(
-    '--push', action='store_true', help='Push final model to bunnyCDN'
-)
+parser.add_argument('--push', action='store_true', help='Push final model to bunnyCDN')
 
 
 @contextmanager
@@ -72,8 +70,10 @@ def set_default_tensor_type(tensor_type):
     yield
     torch.set_default_tensor_type(old_tensor_type)
 
-def push_file(api_key: str, run_id:str, pth: Path):
+
+def push_file(api_key: str, run_id: str, pth: Path):
     from utils.bunny import CDNConnector
+
     conn = CDNConnector(api_key, 'pollen')
     conn.upload_file('models/', pth, file_name=run_id + '.pth')
 
@@ -186,7 +186,7 @@ def train(args):
         logger('Pushing file to bunny...')
         push_file(os.getenv('BUNNY_API_KEY'), run_id, last_model_path)
         logger('Done.')
-    
+
 
 if __name__ == "__main__":
     args = parser.parse_args()

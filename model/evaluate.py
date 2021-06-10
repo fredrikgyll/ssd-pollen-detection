@@ -1,7 +1,7 @@
 # Model, Dataloader, Ground truth
 import torch
 
-from utils.geometry import decode, jaccard
+from model.utils.geometry import decode, jaccard
 
 
 def evaluate(model, data_loader, args):

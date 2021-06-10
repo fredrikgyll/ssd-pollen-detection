@@ -1,6 +1,6 @@
 import torch
 
-from utils import jaccard, intersect
+from model.utils.geometry import intersect, jaccard
 
 """
 Testing basic computations.

@@ -1,9 +1,10 @@
 import pickle
-import torch
 from pathlib import Path
+
 import cv2
-import numpy as np
 import h5py
+import numpy as np
+import torch
 
 
 class Pollene1Dataset:

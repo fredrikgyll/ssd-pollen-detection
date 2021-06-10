@@ -1,10 +1,10 @@
 """Calculates the default boxes (priors) for both SSD300 and SSD512"""
-import torch
-
-from typing import Dict, Any
 from itertools import product
 from math import sqrt
+from typing import Any, Dict
+
 import numpy as np
+import torch
 
 
 def priors() -> torch.Tensor:

@@ -1,8 +1,8 @@
 import random
 
+import numpy as np
 import torch
 import torchvision.transforms.functional as f
-import numpy as np
 
 
 class TransformerSequence:
