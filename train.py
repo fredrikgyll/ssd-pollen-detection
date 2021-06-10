@@ -161,7 +161,7 @@ def train(
             out = model(images)
             # backprop
             optimizer.zero_grad()
-            loss_l, loss_c = criterion(out, targets[:, :4])
+            loss_l, loss_c = criterion(out, targets)
             loss = loss_l + loss_c
             loss.backward()
             optimizer.step()
@@ -219,9 +219,19 @@ if __name__ == "__main__":
     # Data
     root = args.data
     batch_size = args.batch_size
-    transforms = SSDAugmentation()
+    transform = SSDAugmentation()
     # bounds [0.0228, 0.0431]
-    dataset = HDF5Dataset(root, 'balanced1', 'train', transforms, sharpness_bound=[0,1])
+    data_cfg = {
+        'root': root,
+        'dataset': 'balanced1',
+        'mode': 'train',
+        'transform': transform,
+        'sharpness_bound': [0.0, 1],
+    }
+
+    logger('Dataset config:')
+    logger(pformat(data_cfg, indent=4))
+    dataset = HDF5Dataset(**data_cfg)
     data_loader = data.DataLoader(
         dataset,
         batch_size=batch_size,

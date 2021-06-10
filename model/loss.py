@@ -55,8 +55,6 @@ class MultiBoxLoss(nn.Module):
         target_boxes = []
         target_labels = []
         for target in targets:
-            if self.use_cuda:
-                target = target.cuda()
             target_box, target_label = encode(
                 priors.transpose(0, 1), target[:, :4], target[:, 4]
             )
