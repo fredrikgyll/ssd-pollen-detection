@@ -4,6 +4,7 @@ from typing import List, Tuple
 import torch
 import torch.nn.functional as F
 from torch import Tensor
+from icecream import ic
 
 
 def point_form(boxes: Tensor):
@@ -187,7 +188,7 @@ def nms(boxes: Tensor, scores: Tensor, overlap=0.5, top_k=200):
 
 def soft_nms(boxes: Tensor, scores: Tensor, overlap=0.5, top_k=200):
     keep = []
-    
+
     sorted_scores, sorted_scores_idx = scores.sort(descending=True)
     mask = torch.ones_like(scores, dtype=bool)
     sorted_boxes = boxes[sorted_scores_idx]
@@ -198,11 +199,14 @@ def soft_nms(boxes: Tensor, scores: Tensor, overlap=0.5, top_k=200):
         iou = jaccard(selected.unsqueeze(0), sorted_boxes).squeeze()
 
         iou_mask = iou.ge(overlap)
-        sorted_scores[iou_mask] *= (1 - iou[iou_mask])
-        
+        sorted_scores[iou_mask] *= 1 - iou[iou_mask]
+
         sorted_scores, resorting_idx = sorted_scores.sort(descending=True)
         sorted_scores_idx = sorted_scores_idx[resorting_idx]
+        sorted_boxes = sorted_boxes[resorting_idx]
         mask = mask[resorting_idx]
-    
+
+        mask &= sorted_scores.ge(0.10)
     keep = torch.tensor(keep)[:top_k]
-    return keep, len(keep)
+    count = len(keep)
+    return keep, count
