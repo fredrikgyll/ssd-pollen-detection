@@ -3,7 +3,7 @@ from os import sep
 from pathlib import Path
 
 import torch
-from cv2 import data
+import cv2
 from tqdm.auto import tqdm
 
 from model.ssd import make_ssd
@@ -17,6 +17,9 @@ parser.add_argument('--data', '-d', type=Path, help='path to data directory')
 parser.add_argument('--output', '-o', type=Path, help='Path to save folder')
 parser.add_argument(
     '--cuda', action='store_true', help='Train model on cuda enabled GPU'
+)
+parser.add_argument(
+    '--images', action='store_true', help='save the transformed test images'
 )
 
 
@@ -40,8 +43,13 @@ if __name__ == "__main__":
 
     det_dir = args.output / 'detection-results'
     gt_dir = args.output / 'ground-truth'
+
     det_dir.mkdir(parents=True, exist_ok=True)
     gt_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.images:
+        im_dir = args.output / 'images-optional'
+        im_dir.mkdir(parents=True, exist_ok=True)
 
     dim = 300
 
@@ -65,6 +73,11 @@ if __name__ == "__main__":
         except:
             print('error:', i, file)
             continue
+
+        if args.images:
+            im = image.numpy().transpose(1, 2, 0)
+            cv2.imwrite(str(im_dir / (file + '.jpg')), im)
+
         gt_lines = [
             f'{CLASSES[gt[4]]} {" ".join(str(x) for x in gt[:4])}'
             for gt in clean_gt(targets, dim)
