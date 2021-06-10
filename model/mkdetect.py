@@ -46,14 +46,13 @@ if __name__ == "__main__":
 
     dim = 300
 
-
     transforms = SSDAugmentation(train=False)
     dataset = HDF5Dataset(args.data, 'balanced1', 'test', transforms)
 
-    model = make_ssd(phase='test', num_classes=len(dataset.labels)+1)
+    model = make_ssd(phase='test', num_classes=len(dataset.labels) + 1)
     model_state = torch.load(args.checkpoint, map_location=torch.device('cpu'))
     model.load_state_dict(model_state, strict=True)
-    
+
     length = len(dataset)
 
     model.eval()
@@ -61,7 +60,7 @@ if __name__ == "__main__":
         model = model.cuda()
 
     for i in tqdm(range(length)):
-        file = Path(dataset.images[i])
+        file = dataset.names[i]
         image, targets = dataset[i]
         gt_lines = [
             f'{CLASSES[gt[4]]} {" ".join(str(x) for x in gt[:4])}'
@@ -85,7 +84,7 @@ if __name__ == "__main__":
                             for conf, bounds in zip(confs, boxes)
                         ]
                     )
-        out_name = file.stem + '.txt'
+        out_name = file + '.txt'
         gt_file = gt_dir / out_name
         det_file = det_dir / out_name
         gt_file.write_text('\n'.join(gt_lines))

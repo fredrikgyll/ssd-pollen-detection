@@ -79,7 +79,7 @@ class AstmaDataset:
 
         target = self.bboxes[file]
         target = target.astype(float)
-        target[:,:4] /= 2
+        target[:, :4] /= 2
         # target = target[target[:,4] != 3]
 
         im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
