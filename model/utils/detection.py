@@ -1,7 +1,7 @@
 import torch
 from icecream import ic
 
-from model.utils.geometry import area, nms, soft_nms
+from model.utils.geometry import area, nms
 
 
 # Adapted from https://github.com/Hakuyume/chainer-ssd
@@ -53,8 +53,6 @@ class Detect:
         self.area_thresh = area_thresh
         # Parameters used in nms.
         self.nms_thresh = nms_thresh
-        if nms_thresh <= 0:
-            raise ValueError('nms_threshold must be non negative.')
         self.conf_thresh = conf_thresh
         self.variance = variances
 
@@ -92,12 +90,37 @@ class Detect:
                 l_mask = c_mask.unsqueeze(1).expand_as(decoded_boxes)
                 boxes = decoded_boxes[l_mask].view(-1, 4)
                 # idx of highest scoring and non-overlapping boxes per class
-                ids, count = soft_nms(boxes, scores, self.nms_thresh, self.top_k)
+                ids, count = nms(
+                    boxes,
+                    scores,
+                    overlap=self.nms_thresh,
+                    top_k=self.top_k,
+                    sigma=0.15,
+                    penelty='gausian',
+                )
                 output[i, cl, :count] = torch.cat(
-                    (scores[ids[:count]].unsqueeze(1), boxes[ids[:count]]), 1
+                    (scores[ids].unsqueeze(1), boxes[ids]), 1
                 )
         flt = output.contiguous().view(num, -1, 5)
-        _, idx = flt[:, :, 0].sort(1, descending=True)
-        _, rank = idx.sort(1)
-        flt[(rank < self.top_k).unsqueeze(-1).expand_as(flt)].fill_(0)
+        if 0:
+            _, idx = flt[:, :, 0].sort(1, descending=True)
+            _, rank = idx.sort(1)
+            mask = rank >= self.top_k
+        else:
+            mask = torch.ones(flt.shape[:2], dtype=bool, device=output.device)
+            for j, b in enumerate(flt):
+                keep, _ = nms(
+                    b[:, 1:],
+                    b[:, 0],
+                    overlap=0.9,
+                    top_k=self.top_k,
+                    sigma=0.15,
+                    penelty='original',
+                )
+                if keep.numel():
+                    mask[i, keep] = False
+        mask = (
+            mask.unsqueeze(-1).expand_as(flt).view(num, self.num_classes, self.top_k, 5)
+        )
+        output.masked_fill_(mask, 0)
         return output

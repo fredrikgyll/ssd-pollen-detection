@@ -161,7 +161,26 @@ def encode(
     return boxes_out.transpose(0, 1), labels_out
 
 
-def nms(boxes: Tensor, scores: Tensor, overlap=0.5, top_k=200):
+def _gausian_penelty(iou, scores, sigma=0.2, **kwargs):
+    exp = iou ** 2 / sigma
+    scores *= torch.exp(-exp)
+    return scores.sort(descending=True)
+
+
+def _linear_penelty(iou, scores, threshold=0.5, **kwargs):
+    iou_mask = iou.ge(threshold)
+    scores[iou_mask] *= 1 - iou[iou_mask]
+    return scores.sort(descending=True)
+
+
+def _original_penelty(iou, scores, threshold=0.5, **kwargs):
+    iou_mask = iou.le(threshold)
+    return scores, iou_mask
+
+
+def nms(
+    boxes: Tensor, scores: Tensor, overlap=0.5, sigma=0.1, top_k=200, penelty='gausian'
+):
     """Apply Non-maximum Suppression to boxes based on score value
     :param boxes: (tensor) The location preds for the img, Shape: [num_priors,4].
     :param scores: (tensor) The class predscores for the img, Shape:[num_priors].
@@ -170,43 +189,27 @@ def nms(boxes: Tensor, scores: Tensor, overlap=0.5, top_k=200):
     :returns: The indices of the kept boxes with respect to num_priors.
     """
     keep = []
+    rescore = {
+        'gausian': _gausian_penelty,
+        'linear': _linear_penelty,
+        'original': _original_penelty,
+    }[penelty]
 
     sorted_scores, sorted_scores_idx = scores.sort(descending=True)
-    mask = torch.ones_like(scores, dtype=bool)
     sorted_boxes = boxes[sorted_scores_idx]
 
-    while mask.any():
-        keep.append(sorted_scores_idx[mask][0].item())
-        selected = boxes[keep[-1]]
-        iou = jaccard(selected.unsqueeze(0), sorted_boxes).squeeze()
-        iou_mask = iou.le(overlap)
-        mask &= iou_mask
-
-    keep = torch.tensor(keep)[:top_k]
-    return keep, len(keep)
-
-
-def soft_nms(boxes: Tensor, scores: Tensor, overlap=0.5, top_k=200):
-    keep = []
-
-    sorted_scores, sorted_scores_idx = scores.sort(descending=True)
-    mask = torch.ones_like(scores, dtype=bool)
-    sorted_boxes = boxes[sorted_scores_idx]
-
-    while mask.any():
-        keep.append(sorted_scores_idx[mask][0].item())
+    while sorted_boxes.numel() and (sorted_scores.ge(0.05)).any():
+        keep.append(sorted_scores_idx[0].item())
         selected = boxes[keep[-1]]
         iou = jaccard(selected.unsqueeze(0), sorted_boxes).squeeze()
 
-        iou_mask = iou.ge(overlap)
-        sorted_scores[iou_mask] *= 1 - iou[iou_mask]
+        sorted_scores, rescoring_idx = rescore(
+            iou, sorted_scores, threshold=overlap, sigma=sigma
+        )
 
-        sorted_scores, resorting_idx = sorted_scores.sort(descending=True)
-        sorted_scores_idx = sorted_scores_idx[resorting_idx]
-        sorted_boxes = sorted_boxes[resorting_idx]
-        mask = mask[resorting_idx]
+        sorted_scores_idx = sorted_scores_idx[rescoring_idx]
+        sorted_boxes = sorted_boxes[rescoring_idx]
 
-        mask &= sorted_scores.ge(0.10)
     keep = torch.tensor(keep)[:top_k]
     count = len(keep)
     return keep, count
