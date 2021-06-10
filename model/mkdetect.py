@@ -5,6 +5,7 @@ from pathlib import Path
 from cv2 import data
 from ssd import make_ssd
 import torch
+from tqdm.auto import tqdm
 from utils.augmentations import SSDAugmentation
 
 from utils.data import Pollene1Dataset
@@ -54,8 +55,10 @@ if __name__ == "__main__":
     length = len(dataset)
 
     model.eval()
+    if args.cuda:
+        model = model.cuda()
 
-    for i in range(3):
+    for i in tqdm(range(length)):
         file = Path(dataset.images[i])
         image, targets = dataset[i]
         gt_lines = [
@@ -64,6 +67,8 @@ if __name__ == "__main__":
         ]
         det_lines = []
         with torch.no_grad():
+            if args.cuda:
+                image = image.cuda()
             detections = model(image.unsqueeze(0))
             for j, name in enumerate(CLASSES, start=1):
                 dets = detections[0, j, ...]  # only one class which is nr. 1
