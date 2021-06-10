@@ -19,7 +19,7 @@ class VisdomLinePlotter(object):
                 opts=dict(
                     legend=[split_name],
                     title=title_name,
-                    xlabel='Epochs',
+                    xlabel='Batch',
                     ylabel=var_name,
                 ),
             )

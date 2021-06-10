@@ -142,7 +142,9 @@ def train(args):
             scheduler.step()
             epoch_loss.append(loss.item())
             if args.viz:
-                plotter.plot('loss', 'train', 'Loss', iteration, loss.item())
+                plotter.plot('loss', 'loc', 'Loss', iteration, loss_l.item())
+                plotter.plot('loss', 'conf', 'Loss', iteration, loss_c.item())
+                plotter.plot('loss', 'total', 'Loss', iteration, loss.item())
             iteration += 1
             if bidx % 10 == 0:
                 logger(f'Loss Iter. {bidx:02d}: {loss.item():6.3f}')
