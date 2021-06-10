@@ -28,6 +28,14 @@ def interpolate(precision, recall):
         interpolation.append(np.max(pre[rec >= p]))
     return np.array(interpolation)
 
+def calc_map(metrics, class_subset):
+    aps = ap = [metrics[cls]['average_precision'] for cls in class_subset]
+    return np.mean(aps)
+
+def load_run_metrics(root: Path):
+    files = sorted(root.glob('*.pkl'))
+    metrics = [pickle.loads(f.read_bytes()) for f in files]
+    return metrics
 
 def evaluate(model, dataset, class_subset, cuda=False, quiet=True):
     length = len(dataset)
@@ -93,6 +101,9 @@ def evaluate(model, dataset, class_subset, cuda=False, quiet=True):
         }
 
     return metrics
+
+def evaluate_run(run_id):
+    pass
 
 
 if __name__ == "__main__":
