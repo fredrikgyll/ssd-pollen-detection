@@ -15,7 +15,7 @@ from torch.optim import SGD
 from torch.optim.lr_scheduler import MultiStepLR
 
 from model.loss import MultiBoxLoss
-from model.plotting import VisdomLinePlotter
+from model.utils.plotting import VisdomLinePlotter
 from model.ssd import SSD, ResNet
 from model.utils.augmentations import SSDAugmentation
 from model.utils.data import HDF5Dataset, collate

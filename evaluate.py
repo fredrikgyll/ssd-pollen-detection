@@ -8,11 +8,12 @@ import numpy as np
 import torch
 from cv2 import data
 from icecream import ic
-from ssd import make_ssd
 from tqdm.auto import tqdm
-from utils.augmentations import SSDAugmentation
-from utils.data import HDF5Dataset
-from utils.geometry import jaccard
+
+from model.ssd import make_ssd
+from model.utils.augmentations import SSDAugmentation
+from model.utils.data import HDF5Dataset
+from model.utils.geometry import jaccard
 
 parser = argparse.ArgumentParser(description='Train SSD300 model')
 
