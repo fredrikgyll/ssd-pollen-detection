@@ -30,6 +30,29 @@ class Pollene1Dataset:
     def __len__(self):
         return len(self.images)
 
+class AstmaDataset:
+    def __init__(self, root: Path, mode: str, transform) -> None:
+        self.transform = transform
+        self.bboxes = pickle.load((root / f'annotations/{mode}.pkl').open('rb'))
+        self.image_dir = root / mode
+        self.images = list(sorted(self.bboxes.keys()))
+        self.labels = ['poaceae', 'corylus', 'alnus', 'unknown']
+
+    def __getitem__(self, idx):
+        file = self.images[idx]
+        img = cv2.imread(str(self.image_dir / file))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        target = self.bboxes[file]
+        target = target.astype(float)
+
+        im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
+
+        target = torch.hstack((bboxes, labels.unsqueeze(1)))
+        return im, target
+
+    def __len__(self):
+        return len(self.images)
 
 class DataBatch:
     def __init__(self, data):
