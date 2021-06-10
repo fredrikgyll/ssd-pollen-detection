@@ -30,7 +30,7 @@ def interpolate(precision, recall):
 
 
 def calc_map(metrics, class_subset):
-    aps = ap = [metrics[cls]['average_precision'] for cls in class_subset]
+    aps = [metrics[cls]['average_precision'] for cls in class_subset]
     return np.mean(aps)
 
 
@@ -120,8 +120,8 @@ def evaluate_run(run_dir: Path, data_root: Path, class_subset, quiet=True):
 
     for i, file in enumerate(checkpoints):
         not quiet and print(f'[{i+1:2d}/{len(checkpoints)}] {file.stem}')
-        model_state = torch.load(file, map_location=torch.device('cuda'))
-        model.load_state_dict(model_state, strict=True)
+        state = torch.load(file, map_location=torch.device('cuda'))
+        model.load_state_dict(state['model_state_dict'], strict=True)
         metrics = [evaluate(model, dst, class_subset, quiet=quiet) for dst in datasets]
         maps.append([calc_map(m, class_subset) for m in metrics])
     test_map, train_map = list(zip(*maps))
@@ -133,7 +133,7 @@ def evaluate_run(run_dir: Path, data_root: Path, class_subset, quiet=True):
 
 
 if __name__ == "__main__":
-    CLASSES = ['poaceae', 'corylus', 'alnus', 'unknown']
+    CLASSES = ['poaceae', 'corylus', 'alnus']
 
     parser = argparse.ArgumentParser(description='Evaluate SSD300 model')
 
@@ -141,6 +141,7 @@ if __name__ == "__main__":
         '--checkpoint', '-c', type=Path, help='Path to model checkpoint'
     )
     parser.add_argument('--data', '-d', type=Path, help='path to data directory')
+    parser.add_argument('--mode', '-m', type=str, help='dataset mode', default='test')
     parser.add_argument(
         '--output',
         '-o',
@@ -148,19 +149,16 @@ if __name__ == "__main__":
         default=Path('./metrics.pkl'),
         help='Path to save evaluation',
     )
-    parser.add_argument(
-        '--cuda', action='store_true', help='Train model on cuda enabled GPU'
-    )
 
     args = parser.parse_args()
 
     transforms = SSDAugmentation(train=False)
-    dataset = HDF5Dataset(args.data, 'balanced1', 'test', transforms)
-
+    dataset = HDF5Dataset(args.data, 'balanced1', args.mode, transforms)
     model = make_ssd(phase='test', num_classes=len(dataset.labels) + 1)
-    model_state = torch.load(args.checkpoint, map_location=torch.device('cpu'))
-    model.load_state_dict(model_state, strict=True)
+    model = model.cuda()
 
-    metrics = evaluate(model, dataset, CLASSES, cuda=args.cuda, quiet=False)
+    state = torch.load(args.checkpoint, map_location=torch.device('cuda'))
+    model.load_state_dict(state['model_state_dict'], strict=True)
 
+    metrics = evaluate(model, dataset, CLASSES, quiet=False)
     args.output.write_bytes(pickle.dumps(metrics))

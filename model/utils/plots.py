@@ -95,8 +95,23 @@ def make_run_map(iter, test, train, save=None):
     ax.plot(iter, train, 'x--g', label='train')
     plt.xlabel('Iteration')
     plt.ylabel('mAP')
-    plt.title('mAP')
+    plt.title('Learning mAP')
     plt.legend()
+    plt.grid()
+    fig.tight_layout()
+
+    if save:
+        plt.savefig(save)
+    else:
+        plt.show()
+
+def make_loss_plot(loss_l, loss_c, save=None):
+
+    fig, ax = plt.subplots()
+    ax.scatter(np.arange(len(loss_l)), loss_c+loss_l, s=0.2, marker='.', label='loss')
+    plt.xlabel('Iteration')
+    plt.ylabel('Loss')
+    plt.title('Learning Loss')
     plt.grid()
     fig.tight_layout()
 
