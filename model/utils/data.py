@@ -11,6 +11,7 @@ class Pollene1Dataset:
         self.bboxes = pickle.load((root / f'annotations/new/{mode}.pkl').open('rb'))
         self.image_dir = root / mode
         self.images = list(sorted(self.bboxes.keys()))
+        self.labels = ['pollen']
         # self.dims = np.array([640, 512, 640, 512])
 
     def __getitem__(self, idx):
