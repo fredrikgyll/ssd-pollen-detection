@@ -103,9 +103,8 @@ def train(args):
     )
     scheduler = MultiStepLR(optimizer=optimizer, milestones=args.multistep, gamma=0.1)
 
-    criterion = MultiBoxLoss(
-        cfg['num_classes'], 0.5, True, 0, True, 3, 0.5, False, args.cuda
-    )
+    criterion = MultiBoxLoss([0.1, 0.2], args.cuda)
+
     if args.cuda:
         ssd_net = ssd_net.cuda()
         criterion = criterion.cuda()

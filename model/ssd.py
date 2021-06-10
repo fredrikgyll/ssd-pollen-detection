@@ -117,8 +117,8 @@ class SSD(nn.Module):
             conf.append(c(x).view(x.size(0), self.num_classes, -1))
 
         # dims: batch, offsets/class scale-row-col-aspect
-        loc_tensor: Tensor = torch.cat(loc, 2).transpose(1, 2).contiguous()
-        conf_tensor: Tensor = torch.cat(conf, 2).transpose(1, 2).contiguous()
+        loc_tensor: Tensor = torch.cat(loc, 2).contiguous()
+        conf_tensor: Tensor = torch.cat(conf, 2).contiguous()
 
         if self.phase == "train":
             output = (
@@ -128,9 +128,9 @@ class SSD(nn.Module):
             )
         else:
             output = self.detect(
-                loc_tensor,  # loc preds
-                F.softmax(conf_tensor, dim=-1),
-                self.priors.type_as(x),  # default boxes
+                loc_tensor.transpose(1, 2),  # loc preds
+                F.softmax(conf_tensor.transpose(1, 2), dim=-1),
+                self.priors.transpose(0, 1).type_as(x),  # default boxes
             )
         return output
 

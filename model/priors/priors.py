@@ -97,7 +97,7 @@ class PriorBox:
                     mean.append([cx, cy, default_w, default_h])
 
         # back to torch land
-        output = torch.tensor(mean)
+        output = torch.tensor(mean).transpose(0, 1)  # [4, -1]
         if self.clip:
             output.clamp_(max=1, min=0)
         return output
