@@ -170,8 +170,6 @@ def rescale_batch(
     # to actual bounding boxes
     dboxes = defaults.unsqueeze(dim=0)
 
-    ploc[:, :, :2] = 0.1 * ploc[:, :, :2]
-    ploc[:, :, 2:] = 0.2 * ploc[:, :, 2:]
 
     ploc[:, :, :2] = ploc[:, :, :2] * dboxes[:, :, 2:] + dboxes[:, :, :2]
     ploc[:, :, 2:] = ploc[:, :, 2:].exp() * dboxes[:, :, 2:]

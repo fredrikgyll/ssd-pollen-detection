@@ -22,8 +22,8 @@ class MultiBoxLoss(nn.Module):
         dwh = self.dboxes[:, 2:, :]
         gxy = gloc[:, :2, :]
         gwh = gloc[:, 2:, :]
-        gxy = (1.0 / 0.1) * (gxy - dxy) / dwh
-        gwh = (1.0 / 0.2) * (gwh / dwh).log()
+        gxy = (gxy - dxy) / dwh
+        gwh = (gwh / dwh).log()
         return torch.cat((gxy, gwh), dim=1).contiguous()
 
     def hard_negative_mining(self, loss, mask, pos_num):
