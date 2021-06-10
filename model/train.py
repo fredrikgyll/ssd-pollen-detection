@@ -15,8 +15,6 @@ from plotting import VisdomLinePlotter
 from ssd import ResNet, SSD
 from loss import MultiBoxLoss
 from utils.amdegroot_aug import SSDAugmentation
-from utils.augmentations import get_transform
-from utils.geometry import encode
 from utils.data import Pollene1Dataset, collate
 from utils.logger import Logger
 

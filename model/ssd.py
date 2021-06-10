@@ -106,12 +106,17 @@ class SSD(nn.Module):
         conf: List[Tensor] = []
         for x, l, c in zip(source_layers, self.loc_head, self.conf_head):
             # dims: batch, row, col, class/offset per aspect
-            loc.append(l(x).view(x.size(0), 4, -1))
-            conf.append(c(x).view(x.size(0), self.num_classes, -1))
+            loc.append(l(x).permute(0, 2, 3, 1).contiguous())
+            conf.append(c(x).permute(0, 2, 3, 1).contiguous())
         # dims: batch, offsets/class scale-row-col-aspect
-        loc_tensor: Tensor = torch.cat(loc, 2).transpose(1, 2).contiguous()
-        conf_tensor: Tensor = torch.cat(conf, 2).transpose(1, 2).contiguous()
-        return loc_tensor, conf_tensor, self.priors
+        loc_tensor = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
+        conf_tensor = torch.cat([o.view(o.size(0), -1) for o in conf], 1)
+
+        return (
+            loc_tensor.view(loc_tensor.size(0), -1, 4),
+            conf_tensor.view(conf_tensor.size(0), -1, self.num_classes),
+            self.priors,
+        )
 
     def _extra_layers(self, in_channels: List[int]) -> nn.ModuleList:
         # Extra layers for feature scaling
@@ -150,5 +155,5 @@ def make_ssd(num_classes: int = 2) -> SSD:
         num_classes=num_classes,
         default_boxes=[4, 6, 6, 6, 4, 4],
     )
-    base = ResNet()
+    base = ResNet(backbone='resnet34')
     return SSD(base, cfg)
