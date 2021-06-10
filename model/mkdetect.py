@@ -1,15 +1,18 @@
 import argparse
+import pickle
+from collections import defaultdict
 from os import sep
 from pathlib import Path
 
-from cv2 import data
-from ssd import make_ssd
+import numpy as np
 import torch
+from cv2 import data
 from tqdm.auto import tqdm
+
+from ssd import make_ssd
 from utils.augmentations import SSDAugmentation
-
 from utils.data import HDF5Dataset
-
+from utils.geometry import jaccard
 
 parser = argparse.ArgumentParser(description='Train SSD300 model')
 
@@ -20,31 +23,14 @@ parser.add_argument(
     '--cuda', action='store_true', help='Train model on cuda enabled GPU'
 )
 
-
-def clean_pred(confs, predictions, dim):
-    predictions *= dim
-    return (
-        confs.squeeze(-1).cpu().numpy(),
-        predictions.int().cpu().numpy(),
-    )
-
-
-def clean_gt(targets, dim):
-    targets[:, :4] *= dim
-    return targets.int().cpu().numpy()
-
-
 CLASSES = ['poaceae', 'corylus', 'alnus', 'unknown']
 
 if __name__ == "__main__":
     args = parser.parse_args()
 
-    det_dir = args.output / 'detection-results'
-    gt_dir = args.output / 'ground-truth'
-    det_dir.mkdir(exist_ok=True)
-    gt_dir.mkdir(exist_ok=True)
-
-    dim = 300
+    n_gth = defaultdict(int)
+    predictions = defaultdict(list)
+    confidences = defaultdict(list)
 
     transforms = SSDAugmentation(train=False)
     dataset = HDF5Dataset(args.data, 'balanced1', 'test', transforms)
@@ -62,30 +48,38 @@ if __name__ == "__main__":
     for i in tqdm(range(length)):
         file = dataset.names[i]
         image, targets = dataset[i]
-        gt_lines = [
-            f'{CLASSES[gt[4]]} {" ".join(str(x) for x in gt[:4])}'
-            for gt in clean_gt(targets, dim)
-        ]
-        det_lines = []
+
         with torch.no_grad():
             if args.cuda:
                 image = image.cuda()
+                targets = targets.cuda()
             detections = model(image.unsqueeze(0))
-            for j, name in enumerate(CLASSES, start=1):
-                dets = detections[0, j, ...]  # only one class which is nr. 1
+            for j, name in enumerate(CLASSES):
+                truth = targets[targets[4] == j, :4]
+                n_gth[name] += len(truth)
+                dets = detections[0, j + 1, ...]  # 0 is bkg_label
                 mask = dets[:, 0].gt(0.0)
                 if mask.any():
                     dets = dets[mask, ...]
-                    confs, boxes = torch.split(dets, [1, 4], dim=1)
-                    confs, boxes = clean_pred(confs, boxes, dim)
-                    det_lines.extend(
-                        [
-                            f'{name} {conf} {" ".join(str(b) for b in bounds)}'
-                            for conf, bounds in zip(confs, boxes)
-                        ]
-                    )
-        out_name = file + '.txt'
-        gt_file = gt_dir / out_name
-        det_file = det_dir / out_name
-        gt_file.write_text('\n'.join(gt_lines))
-        det_file.write_text('\n'.join(det_lines))
+                    sorted_conf, order_idx = dets[:, 0].sort(descending=True)
+                    iou = jaccard(dets[order_idx, :4], truth)
+                    preds = torch.zeros(dets.size(0))
+
+                    for ground_column in iou.split(1, 1):
+                        tp = torch.nonzero(ground_column.squeeze() > 0.5).squeeze(-1)
+                        if tp.nelement() > 0:
+                            preds[tp[0]] = 1
+                    predictions[name].append(preds)
+                    confidences[name].append(sorted_conf)
+    precision = {}
+    recall = {}
+    for name in CLASSES:
+        preds = torch.cat(predictions[name], dim=0)
+        confs = torch.cat(confidences[name], dim=0)
+        _, order = confs.sort(descending=True)
+        preds = torch.cumsum(preds[order], dim=0).cpu().numpy()
+        precision[name] = preds / np.arange(1, preds.size() + 1)
+        recall[name] = preds / n_gth[name]
+
+    out = {'precision': precision, 'recall': recall}
+    (args.output / 'map.pkl').write_bytes(pickle.dumps(out))
