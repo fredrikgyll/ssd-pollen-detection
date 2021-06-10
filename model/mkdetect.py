@@ -8,7 +8,7 @@ import torch
 from tqdm.auto import tqdm
 from utils.augmentations import SSDAugmentation
 
-from utils.data import Pollene1Dataset
+from utils.data import HDF5Dataset
 
 
 parser = argparse.ArgumentParser(description='Train SSD300 model')
@@ -34,7 +34,7 @@ def clean_gt(targets, dim):
     return targets.int().cpu().numpy()
 
 
-CLASSES = ['pollen']
+CLASSES = ['poaceae', 'corylus', 'alnus', 'unknown']
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -46,12 +46,14 @@ if __name__ == "__main__":
 
     dim = 300
 
-    model = make_ssd(phase='test')
+
+    transforms = SSDAugmentation(train=False)
+    dataset = HDF5Dataset(args.data, 'balanced1', 'test', transforms)
+
+    model = make_ssd(phase='test', num_classes=len(dataset.labels)+1)
     model_state = torch.load(args.checkpoint, map_location=torch.device('cpu'))
     model.load_state_dict(model_state, strict=True)
-
-    transform = SSDAugmentation(train=False)
-    dataset = Pollene1Dataset(args.data, 'test', transform)
+    
     length = len(dataset)
 
     model.eval()
