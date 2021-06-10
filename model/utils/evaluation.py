@@ -129,12 +129,15 @@ def evaluate(model, dataset, class_subset, quiet=True):
             'fp': (true_pos == 0).sum().item(),
         }
     table = []
-    detection_table = {'sharpness': [], 'confs': [], 'tps':[]}
+    detection_table = {'sharpness': [], 'confidence': [], 'tp':[]}
     for cls in predictions.values():
         for example in cls:
-            for k in detection_table.keys():
-                detection_table[k].extend(example[k].tolist())
             tp = example['tps'].ge(0)
+
+            detection_table['sharpness'].extend(example['sharpness'])
+            detection_table['confidence'].extend(example['confs'].tolist())
+            detection_table['tp'].extend(tp.tolist())
+
             gt_id = example['tps'][tp]
             file = example['file']
             if not example['truth_idx'].nelement():
