@@ -1,7 +1,7 @@
 import subprocess
 
 HOST = 'simple-hybel'
-REMOTE_DIR = '/mnt/ssd/saves/'
+REMOTE_DIR = '/mnt/ext/saves/'
 LOCAL_DIR = 'saves/'
 MODEL_NAME = 'ssd_last'
 MODEL_EXT = 'pth'

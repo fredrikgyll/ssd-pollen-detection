@@ -5,11 +5,28 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
+            "name": "Debug Script",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceFolder}/model/debugger.py",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug Train",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/model/train.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--save",
+                "${workspaceFolder}/saves",
+                "--data",
+                "${workspaceFolder}/data",
+                "--weights",
+                "${workspaceFolder}/weights/resnet50-19c8e357.pth",
+                "-e",
+                "2"
+            ]
         }
     ]
 }
