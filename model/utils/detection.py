@@ -1,6 +1,7 @@
 import torch
+from icecream import ic
 
-from .geometry import nms
+from .geometry import nms, area
 
 
 # Adapted from https://github.com/Hakuyume/chainer-ssd
@@ -37,11 +38,12 @@ class Detect:
     """
 
     def __init__(
-        self, num_classes, bkg_label, top_k, conf_thresh, nms_thresh, variances
+        self, num_classes, bkg_label, top_k, area_thresh, conf_thresh, nms_thresh, variances
     ):
         self.num_classes = num_classes
         self.background_label = bkg_label
         self.top_k = top_k
+        self.area_thresh = area_thresh
         # Parameters used in nms.
         self.nms_thresh = nms_thresh
         if nms_thresh <= 0:
@@ -67,11 +69,14 @@ class Detect:
         # Decode predictions into bboxes.
         for i in range(num):
             decoded_boxes = decode(loc_data[i], prior_data, self.variance)
+
+            areas = area(decoded_boxes)
+            area_mask = areas.lt(self.area_thresh)
             # For each class, perform nms
             conf_scores = conf_preds[i].clone()
-
+                
             for cl in range(1, self.num_classes):
-                c_mask = conf_scores[cl].gt(self.conf_thresh)
+                c_mask = conf_scores[cl].gt(self.conf_thresh) & area_mask
                 scores = conf_scores[cl][c_mask]
                 if scores.size(0) == 0:
                     continue
