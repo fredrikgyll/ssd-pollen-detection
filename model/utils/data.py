@@ -30,11 +30,12 @@ class Pollene1Dataset:
     def __len__(self):
         return len(self.images)
 
+
 class AstmaDataset:
     def __init__(self, root: Path, mode: str, transform) -> None:
         self.transform = transform
         self.bboxes = pickle.load((root / f'annotations/{mode}.pkl').open('rb'))
-        self.image_dir = root / mode
+        self.image_dir = root / 'Images'
         self.images = list(sorted(self.bboxes.keys()))
         self.labels = ['poaceae', 'corylus', 'alnus', 'unknown']
 
@@ -53,6 +54,7 @@ class AstmaDataset:
 
     def __len__(self):
         return len(self.images)
+
 
 class DataBatch:
     def __init__(self, data):
