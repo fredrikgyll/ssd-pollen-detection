@@ -54,7 +54,7 @@ def annotate_detection(image, targets, detections, class_list, name='', save=Non
         order_idx = torch.argsort(dets[:, 0], descending=True)
         tps = calculate_true_positives(
             dets[order_idx, 1:], targets[targets[:, 4] == i, :4]
-        )
+        ).ge(0)
         boxes.extend(
             [
                 _mk_box(detection=d, label=i, cls=class_list, dim=dim, tp=tp)

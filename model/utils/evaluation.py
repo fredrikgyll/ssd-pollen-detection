@@ -40,11 +40,11 @@ def calculate_true_positives(
     :rtype: `torch.Tensor`
     """
     iou = jaccard(detections, ground_truths)
-    tps = torch.zeros(detections.size(0), dtype=int)
-    for ground_column in iou.split(1, 1):
+    tps = torch.full(detections.size(0), -1, dtype=int)
+    for i, ground_column in enumerate(iou.split(1, 1)):
         tp = torch.nonzero(ground_column.squeeze(-1) > 0.5).squeeze(-1)
         if tp.nelement() > 0:
-            tps[tp[0]] = 1
+            tps[tp[0]] = i
     return tps
 
 
@@ -53,12 +53,11 @@ def evaluate(model, dataset, class_subset, quiet=True):
 
     n_gth = defaultdict(int)
     predictions = defaultdict(list)
-    confidences = defaultdict(list)
 
     model.eval()
     model = model.cuda()
 
-    for i in tqdm(range(length), disable=quiet):
+    for i, file in tqdm(enumerate(dataset.names), total=length, disable=quiet):
         try:
             image, targets = dataset[i]
         except ValueError:
@@ -66,25 +65,31 @@ def evaluate(model, dataset, class_subset, quiet=True):
         image = image.cuda()
         targets = targets.cuda()
         with torch.no_grad():
-            detections = model(image.unsqueeze(0))
+            detections: torch.Tensor = model(image.unsqueeze(0))
         for j, name in enumerate(dataset.labels):
             if name not in class_subset:
                 continue  # skip classes
-            truths = targets[targets[:, 4] == j, :4]
+            truths = targets[targets[:, 4] == j]
             n_gth[name] += len(truths)
             dets = detections[0, j + 1, ...]  # 0 is bkg_label
             mask = dets[:, 0].gt(0.0)
             if mask.any():
                 dets = dets[mask, ...]
                 sorted_conf, order_idx = dets[:, 0].sort(descending=True)
-                tps = calculate_true_positives(dets[order_idx, 1:], truths)
-                predictions[name].append(tps)
-                confidences[name].append(sorted_conf)
+                tps = calculate_true_positives(dets[order_idx, 1:], truths[:, :4])
+                file_dict = {
+                    'tps': tps,
+                    'confs': sorted_conf,
+                    'file': file,
+                    'truth_idx': truths[:, 5],
+                }
+                predictions[name].append(file_dict)
 
     metrics = {}
     for name in class_subset:
-        true_pos = torch.cat(predictions[name], dim=0)
-        confs = torch.cat(confidences[name], dim=0)
+        matched_gt = torch.cat([p['tps'] for p in predictions[name]], dim=0)
+        true_pos = matched_gt.ge(0)
+        confs = torch.cat([p['confs'] for p in predictions[name]], dim=0)
         _, order = confs.sort(descending=True)
         true_pos_cum = torch.cumsum(true_pos[order], dim=0).cpu().numpy()
 
@@ -101,5 +106,13 @@ def evaluate(model, dataset, class_subset, quiet=True):
             'tp': true_pos.sum().item(),
             'fp': (true_pos == 0).sum().item(),
         }
+    table = []
+    for cls in predictions.values():
+        for example in cls:
+            tp = example['tps'].ge(0)
+            file = example['file']
+            for conf, gid in zip(example['confs'][tp], example['truth_idx'][tp]):
+                table.append([file, gid, conf])
 
+    metrics['gt_table'] = table
     return metrics

@@ -57,9 +57,10 @@ class HDF5Dataset:
 
         target = target.astype(float)
         target = target[target[:, 4] != 3, :]
+        labels = np.stack((target[:, 4], np.arange(target.shape[0])), 1)
         im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
 
-        target = torch.hstack((bboxes, labels.unsqueeze(1)))
+        target = torch.hstack((bboxes, labels))
         return im, target
 
     def __len__(self):
@@ -69,7 +70,7 @@ class HDF5Dataset:
 class AstmaDataset:
     def __init__(self, root: Path, name: str, mode: str, transform) -> None:
         self.transform = transform
-        self.bboxes = pickle.loads((root / f'annotations/all.pkl').read_bytes())
+        self.bboxes = pickle.loads((root / 'annotations/all.pkl').read_bytes())
         self.images = json.loads((root / f'datasets/{name}.json').read_text())[mode]
         self.image_dir = root / 'Images'
         self.labels = ['poaceae', 'corylus', 'alnus']
@@ -85,9 +86,11 @@ class AstmaDataset:
         target[:, :4] /= 2
         # target = target[target[:, 4] != 3, ...]
 
-        im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
+        labels = np.stack((target[:, 4], np.arange(target.shape[0])), 1)
 
-        target = torch.hstack((bboxes, labels.unsqueeze(1)))
+        im, bboxes, labels = self.transform(img, target[:, :4], labels)
+
+        target = torch.hstack((bboxes, labels))
         return im, target
 
     def __len__(self):
