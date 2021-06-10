@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import pickle
 import time
 import argparse
@@ -53,6 +54,18 @@ parser.add_argument(
     default=[40, 55],
     help='epochs at which to decay learning rate',
 )
+
+
+@contextmanager
+def set_default_tensor_type(tensor_type):
+    if torch.tensor(0).is_cuda:
+        old_tensor_type = torch.cuda.FloatTensor
+    else:
+        old_tensor_type = torch.FloatTensor
+
+    torch.set_default_tensor_type(tensor_type)
+    yield
+    torch.set_default_tensor_type(old_tensor_type)
 
 
 def train(args):
@@ -111,23 +124,26 @@ def train(args):
         epoch_loss = []
         t1 = time.time()
         for bidx, batch in enumerate(data_loader):
-            images, targets, labels = batch.data()
-            target_boxes = []
-            target_labels = []
-            for truth, label in zip(targets, labels):
-                target_box, target_label = encode(ssd_net.priors, truth, label)
-                target_boxes.append(target_box)
-                target_labels.append(target_label)
-            gloc = torch.stack(target_boxes, dim=0)
-            glabel = torch.stack(target_labels, dim=0).long()
+            with set_default_tensor_type(torch.cuda.FloatTensor):
+                images, targets, labels = batch.data()
+                target_boxes = []
+                target_labels = []
+                for truth, label in zip(targets, labels):
+                    if args.cuda:
+                        truth, label = truth.cuda(), label.cuda()
+                    target_box, target_label = encode(ssd_net.priors, truth, label)
+                    target_boxes.append(target_box)
+                    target_labels.append(target_label)
+                gloc = torch.stack(target_boxes, dim=0)
+                glabel = torch.stack(target_labels, dim=0).long()
 
-            if args.cuda:
-                gloc, glabel, images = gloc.cuda(), glabel.cuda(), images.cuda()
+                if args.cuda:
+                    images = images.cuda()
 
-            ploc, pconf = ssd_net(images)
-            optimizer.zero_grad()
+                ploc, pconf = ssd_net(images)
+                optimizer.zero_grad()
 
-            loss = criterion(ploc, pconf, gloc, glabel)
+                loss = criterion(ploc, pconf, gloc, glabel)
             loss.backward()
             optimizer.step()
             scheduler.step()

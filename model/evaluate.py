@@ -12,10 +12,12 @@ def evaluate(model, data_loader, args):
     for i, batch in enumerate(data_loader):
         print(f'Batch {i:2d}')
         images, targets, labels = batch.data()
-        if args.cuda:
-            images = images.cuda()
+        images = images.cuda()
+        targets = [t.cuda() for t in targets]
+        labels = [l.cuda() for l in labels]
 
         with torch.no_grad():
+            torch.set_default_tensor_type('torch.cuda.FloatTensor')
             ploc, pconf = model(images)
             pboxes, confs, _ = decode(model.priors, ploc, pconf)  # TODO: per label
             for box, truth, conf in zip(pboxes, targets, confs):
