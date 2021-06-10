@@ -90,10 +90,13 @@ def train(args):
     num_classes = len(dataset.labels) + 1
     # Model init
     cfg = dict(
-        size=300, num_classes=num_classes, default_boxes=[4, 6, 6, 6, 4, 4], variances=[0.1, 0.2]
+        size=300,
+        num_classes=num_classes,
+        default_boxes=[4, 6, 6, 6, 4, 4],
+        variances=[0.1, 0.2],
     )
     ssd_net = SSD(ResNet(backbone='resnet34', backbone_path=args.weights), cfg)
-    logger(f'Number of priors is {ssd_net.priors.size(0)}')
+    logger(f'Number of priors is {ssd_net.priors.size(1)}')
     logger(f'Number of extractor layers: {len(ssd_net.loc_head)+1}')
     optimizer = SGD(
         ssd_net.parameters(),

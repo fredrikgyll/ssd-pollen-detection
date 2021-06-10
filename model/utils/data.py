@@ -3,6 +3,7 @@ import torch
 from pathlib import Path
 import cv2
 import numpy as np
+import h5py
 
 
 class Pollene1Dataset:
@@ -30,6 +31,36 @@ class Pollene1Dataset:
 
     def __len__(self):
         return len(self.images)
+
+
+class HDF5Dataset:
+    def __init__(self, root: Path, dataset: str, mode: str, transform) -> None:
+        self.transform = transform
+        self.data_file = root
+        self.labels = ['poaceae', 'corylus', 'alnus', 'unknown']
+        with h5py.File(self.data_file, 'r') as f:
+            self.names = np.array(f[f'datasets/{dataset}/{mode}'])
+
+    def _open_hdf5(self):
+        self.dataset = h5py.File(self.data_file, 'r')
+        self.images = self.dataset['images']
+        self.annotations = self.dataset['annotations']
+
+    def __getitem__(self, idx):
+        if not hasattr(self, 'dataset'):
+            self._open_hdf5()
+        file = self.names[idx]
+        img = self.images.get(file)
+        target = self.annotations.get(file)
+
+        target = target.astype(float)
+        im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
+
+        target = torch.hstack((bboxes, labels.unsqueeze(1)))
+        return im, target
+
+    def __len__(self):
+        return self.names.size
 
 
 class AstmaDataset:
