@@ -14,6 +14,7 @@ from plotting import VisdomLinePlotter
 
 from ssd import ResNet, SSD
 from loss import MultiBoxLoss
+from utils.amdegroot_aug import SSDAugmentation
 from utils.augmentations import get_transform
 from utils.geometry import encode
 from utils.data import Pollene1Dataset, collate
@@ -77,7 +78,7 @@ def train(args):
 
     # Data
     root = args.data
-    transforms = get_transform()
+    transforms = SSDAugmentation()
     dataset = Pollene1Dataset(root, 'train', transforms)
     logger(f'Iterations in dataset {len(dataset)//batch_size}')
     data_loader = data.DataLoader(

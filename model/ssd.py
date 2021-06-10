@@ -95,14 +95,11 @@ class SSD(nn.Module):
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         x = self.base(x)
-        # feat_layer = 0
-        # print(f'layer {feat_layer}: {x.size(2)}')
+
         source_layers = [x]
         for layer in self.extra:
             x = layer(x)
             source_layers.append(x)
-            # feat_layer += 1
-            # print(f'layer {feat_layer}: {x.size(2)}')
 
         loc: List[Tensor] = []
         conf: List[Tensor] = []

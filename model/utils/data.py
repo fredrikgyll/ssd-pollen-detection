@@ -1,9 +1,27 @@
 import pickle
 import torch
 from pathlib import Path
-from PIL import Image
-
+import cv2
 from .augmentations import TransformerSequence
+
+
+class APollene1Dataset:
+    def __init__(self, root: Path, mode: str, transform: TransformerSequence) -> None:
+        self.transform = transform
+        self.bboxes = pickle.load((root / f'annotations/{mode}.pkl').open('rb'))
+        self.image_dir = root / mode
+        self.images = list(sorted(self.bboxes.keys()))
+
+    def __getitem__(self, idx):
+        file = self.images[idx]
+        im = cv2.imread(str(self.image_dir / file))
+        bboxes = self.bboxes[file]
+        labels = torch.ones(bboxes.size(0))
+        im, bboxes, labels = self.transform(im, bboxes, labels)
+        return im, bboxes, labels
+
+    def __len__(self):
+        return len(self.images)
 
 
 class Pollene1Dataset:
@@ -15,7 +33,7 @@ class Pollene1Dataset:
 
     def __getitem__(self, idx):
         file = self.images[idx]
-        im = Image.open(self.image_dir / file)
+        im = cv2.imread(str(self.image_dir / file))
         bboxes = self.bboxes[file]
         labels = torch.ones(bboxes.size(0))
         im, bboxes, labels = self.transform(im, bboxes, labels)
