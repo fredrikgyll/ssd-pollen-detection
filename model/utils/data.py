@@ -39,7 +39,7 @@ class HDF5Dataset:
         self.data_file = root
         self.labels = ['poaceae', 'corylus', 'alnus', 'unknown']
         with h5py.File(self.data_file, 'r') as f:
-            self.names = f[f'datasets/{dataset}/{mode}'].value
+            self.names = f[f'datasets/{dataset}/{mode}'][()]
 
     def _open_hdf5(self):
         self.dataset = h5py.File(self.data_file, 'r')
@@ -50,8 +50,8 @@ class HDF5Dataset:
         if not hasattr(self, 'dataset'):
             self._open_hdf5()
         file = self.names[idx]
-        img = self.images.get(file).value
-        target = self.annotations.get(file).value
+        img = self.images.get(file)[()]
+        target = self.annotations.get(file)[()]
 
         target = target.astype(float)
         im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
