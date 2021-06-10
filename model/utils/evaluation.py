@@ -128,7 +128,8 @@ def evaluate(model, dataset, class_subset, quiet=True):
             'tp': true_pos.sum().item(),
             'fp': (true_pos == 0).sum().item(),
         }
-    table = []
+    gt_table = []
+    fn_table = []
     detection_table = {'sharpness': [], 'confidence': [], 'tp':[]}
     for cls in predictions.values():
         for example in cls:
@@ -142,9 +143,14 @@ def evaluate(model, dataset, class_subset, quiet=True):
             file = example['file']
             if not example['truth_idx'].nelement():
                 continue
-            for conf, gid in zip(example['confs'][tp], example['truth_idx'][gt_id]):
-                table.append([file, gid.int().item(), conf.item()])
+            tps = example['truth_idx'][gt_id]
+            for conf, gid in zip(example['confs'][tp], tps):
+                gt_table.append([file, gid.int().item(), conf.item()])
+                
+            fn = set(example['truth_idx'].tolist()) - set(tps.tolist())
+            fn_table.extend([[file, idx] for idx in fn])
 
-    metrics['gt_table'] = table
+    metrics['gt_table'] = gt_table
+    metrics['fn_table'] = gt_table
     metrics['detection_table'] = detection_table
     return metrics
