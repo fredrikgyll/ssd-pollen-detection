@@ -291,7 +291,7 @@ class Expand(object):
             return image, boxes, labels
 
         height, width, depth = image.shape
-        ratio = random.uniform(1, 4)
+        ratio = random.uniform(1, 1.5)
         left = random.uniform(0, width * ratio - width)
         top = random.uniform(0, height * ratio - height)
 
@@ -373,7 +373,7 @@ class PhotometricDistort(object):
 
 class ToTensor:
     def __call__(self, image, boxes, labels):
-        tensor_im = transforms.functional.to_tensor(image)
+        tensor_im = torch.FloatTensor(image).permute(2, 0, 1) / 255
         tensor_boxes = torch.FloatTensor(boxes)
         tensor_targets = torch.FloatTensor(labels)
         return tensor_im, tensor_boxes, tensor_targets

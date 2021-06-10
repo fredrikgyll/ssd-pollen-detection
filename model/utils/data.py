@@ -22,8 +22,6 @@ class Pollene1Dataset:
         target = target.astype(float)
         target[:, :4] /= self.dims
 
-        self.transform(img, target[:, :4], target[:, 4])
-
         im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
 
         target = torch.hstack((bboxes, labels.unsqueeze(1)))
