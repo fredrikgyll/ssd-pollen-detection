@@ -126,8 +126,8 @@ def train(args):
         epoch_loss = []
         t1 = time.time()
         for bidx, batch in enumerate(data_loader):
+            images, targets = batch.data()
             with set_default_tensor_type(torch.cuda.FloatTensor):
-                images, targets = batch.data()
 
                 if args.cuda:
                     images = images.cuda()
