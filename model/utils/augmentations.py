@@ -30,6 +30,10 @@ class CV2Tensor:
         new_image = f.to_tensor(image)
         return new_image, boxes, labels
 
+class Tensor2CV:
+    def __call__(self, image, boxes, labels):
+        new_img = image.transpose(1, 2, 0).mul(255).to(torch.uint8).cpu().numpy()
+        return new_img, boxes, labels
 
 class TargetsToTensor:
     def __call__(self, image, boxes, labels):
@@ -188,7 +192,7 @@ class ColorSift:
         return image, boxes, labels
 
 
-class SSDAugmentation(object):
+class SSDAugmentation:
     def __init__(self, size=300, train=True):
         self.size = size
         if train:
@@ -217,3 +221,14 @@ class SSDAugmentation(object):
 
     def __call__(self, img, boxes, labels):
         return self.augment(img, boxes, labels)
+
+class UnAugment:
+    def __init__(self):
+        transforms = [
+            DeNormalize(),  # boxes _ -> _
+            Tensor2CV(),
+        ]
+        self.augment = TransformerSequence(transforms)
+
+    def __call__(self, img):
+        return self.augment(img)

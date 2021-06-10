@@ -1,11 +1,14 @@
 from collections import defaultdict
 
+import cv2
 import numpy as np
 import torch
 from tqdm.auto import tqdm
 from icecream import ic
 
+from model.utils.augmentations import UnAugment
 from model.utils.geometry import jaccard
+from model.utils.sharpness import image_bbox_quality
 
 
 def interpolate(precision: np.ndarray, recall: np.ndarray) -> np.ndarray:
@@ -47,8 +50,23 @@ def calculate_true_positives(
             tps[tp[0]] = i
     return tps
 
+def calculate_detection_sharpness(detections: torch.Tensor, image: np.ndarray):
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    h, w = image.shape
+    bbox = torch.stack(
+        (
+            detections[:,0] * w,
+            detections[:,1] * h,
+            detections[:,3] * w,
+            detections[:,4] * h,
+        ),
+        dim=1
+    ).cpu().numpy()
+    return image_bbox_quality(image, bbox)
+
 
 def evaluate(model, dataset, class_subset, quiet=True):
+    un_augment = UnAugment()
     length = len(dataset)
 
     n_gth = defaultdict(int)
@@ -77,8 +95,12 @@ def evaluate(model, dataset, class_subset, quiet=True):
                 dets = dets[mask, ...]
                 sorted_conf, order_idx = dets[:, 0].sort(descending=True)
                 tps = calculate_true_positives(dets[order_idx, 1:], truths[:, :4])
+                sharpness = calculate_detection_sharpness(
+                    dets[order_idx, 1:], un_augment(image)
+                )
                 file_dict = {
                     'tps': tps,
+                    'sharpness': sharpness,
                     'confs': sorted_conf,
                     'file': file,
                     'truth_idx': truths[:, 5],
@@ -107,8 +129,11 @@ def evaluate(model, dataset, class_subset, quiet=True):
             'fp': (true_pos == 0).sum().item(),
         }
     table = []
+    detection_table = {'sharpness': [], 'confs': [], 'tps':[]}
     for cls in predictions.values():
         for example in cls:
+            for k in detection_table.keys():
+                detection_table[k].extend(example[k].tolist())
             tp = example['tps'].ge(0)
             gt_id = example['tps'][tp]
             file = example['file']
@@ -118,4 +143,5 @@ def evaluate(model, dataset, class_subset, quiet=True):
                 table.append([file, gid.int().item(), conf.item()])
 
     metrics['gt_table'] = table
+    metrics['detection_table'] = detection_table
     return metrics
