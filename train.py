@@ -93,6 +93,10 @@ def save_state(model, optimizer, criterion, scheduler, iteration, dir):
             'scheduler_state_dict': scheduler.state_dict(),
             'criterion': criterion,
             'iteration': iteration,
+            'num_classes': model.num_classes,
+            'layer_activations': model.layer_activation,
+            'size': model.size,
+            'default_boxes': model.default_boxes,
         },
         save_name(dir, iteration),
     )
@@ -231,7 +235,7 @@ if __name__ == "__main__":
     cfg = dict(
         size=300,
         num_classes=num_classes,
-        layer_activation=[True, True, False, True, False, True],
+        layer_activation=[True, True, True, True, True, False],
         default_boxes=[4, 6, 6, 6, 4, 4],
         variances=[0.1, 0.2],
     )

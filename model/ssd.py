@@ -118,9 +118,10 @@ class SSD(nn.Module):
         x = self.base(x)
 
         source_layers = [x]
-        for layer in self.extra:
-            x = layer(x)
-            source_layers.append(x)
+        for i, layer in enumerate(self.extra, start=1):
+            if any(self.layer_activation[i:]):
+                x = layer(x)
+                source_layers.append(x)
 
         source_layers = [
             layer
