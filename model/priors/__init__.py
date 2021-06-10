@@ -1,1 +1,1 @@
-from .priors import PriorBox, priors
+from .priors import PriorBox

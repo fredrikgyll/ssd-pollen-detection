@@ -231,6 +231,7 @@ if __name__ == "__main__":
     cfg = dict(
         size=300,
         num_classes=num_classes,
+        layer_activation=[True, True, False, True, False, True],
         default_boxes=[4, 6, 6, 6, 4, 4],
         variances=[0.1, 0.2],
     )
@@ -262,7 +263,7 @@ if __name__ == "__main__":
         logger('Starting from checkpoint at iteration: {start_iter}')
     else:
         start_iter = 1
-        criterion = MultiBoxLoss([0.1, 0.2], args.cuda)
+        criterion = MultiBoxLoss(cfg['variances'], args.cuda)
 
         model._init_weights()
 

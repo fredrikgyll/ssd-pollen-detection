@@ -73,8 +73,9 @@ class SSD(nn.Module):
 
         self.num_classes = cfg['num_classes']
         self.size = cfg['size']
+        self.layer_activation = cfg['layer_activation']
         self.default_boxes = cfg['default_boxes']
-        priors = PriorBox()
+        priors = PriorBox(cfg)
         self.priors = nn.Parameter(priors.forward(), requires_grad=False)
         self.phase = phase
 
@@ -82,7 +83,11 @@ class SSD(nn.Module):
         self.extra = self._extra_layers(base.out_channels)
 
         _loc_layers, _conf_layers = [], []
-        for oc, nd in zip(self.base.out_channels, self.default_boxes):
+        for oc, nd, active in zip(
+            self.base.out_channels, self.default_boxes, self.layer_activation
+        ):
+            if not active:
+                continue
             _loc_layers.append(nn.Conv2d(oc, 4 * nd, kernel_size=3, padding=1))
             _conf_layers.append(
                 nn.Conv2d(oc, self.num_classes * nd, kernel_size=3, padding=1)
@@ -116,6 +121,12 @@ class SSD(nn.Module):
         for layer in self.extra:
             x = layer(x)
             source_layers.append(x)
+
+        source_layers = [
+            layer
+            for layer, active in zip(source_layers, self.layer_activation)
+            if active
+        ]
 
         loc: List[Tensor] = []
         conf: List[Tensor] = []
@@ -183,6 +194,7 @@ def make_ssd(
     ssd_cfg = cfg or dict(
         size=300,
         num_classes=num_classes,
+        layer_activation=[True, True, True, True, True, True],
         default_boxes=[4, 6, 6, 6, 4, 4],
         variances=[0.1, 0.2],
     )
