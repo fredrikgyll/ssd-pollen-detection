@@ -122,7 +122,9 @@ def train(
     cuda=True,
 ):
     table_widths = [10, 9, 9, 9, 9, 9]
-    log_row = '| {{:>{}}} | {{:{}.4f}} | {{:{}.4f}} | {{:{}.4f}} | {{:>{}}} | {{:>{}}} |'
+    log_row = (
+        '| {{:>{}}} | {{:{}.4f}} | {{:{}.4f}} | {{:{}.4f}} | {{:>{}}} | {{:>{}}} |'
+    )
     log_row = log_row.format(*table_widths)
     row_width = 4 + sum(table_widths) + 3 * (len(table_widths) - 1)
     header = ['Iteration', 'Loc loss', 'Conf Loss', 'Loss Sum', 'Elapsed', 'ETA']

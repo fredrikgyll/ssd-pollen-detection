@@ -105,10 +105,11 @@ def make_run_map(iter, test, train, save=None):
     else:
         plt.show()
 
+
 def make_loss_plot(loss_l, loss_c, save=None):
 
     fig, ax = plt.subplots()
-    ax.scatter(np.arange(len(loss_l)), loss_c+loss_l, s=0.2, marker='.', label='loss')
+    ax.scatter(np.arange(len(loss_l)), loss_c + loss_l, s=0.2, marker='.', label='loss')
     plt.xlabel('Iteration')
     plt.ylabel('Loss')
     plt.title('Learning Loss')

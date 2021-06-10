@@ -13,7 +13,7 @@ from model.ssd import make_ssd
 from model.utils.augmentations import DeNormalize, SSDAugmentation
 from model.utils.data import AstmaDataset, Pollene1Dataset, collate
 
-model_name = '2021-04-06T09-11-21'
+model_name = '2021-04-06T13-47-35'
 model_ch = Path('/Users/fredrikg/Projects/pollendb1/saves') / f'{model_name}.pth'
 
 
@@ -111,121 +111,29 @@ def data_pipeline():
     print(labels.shape)
 
 
-def infer(name):
-    import matplotlib.patches as patches
+def infer():
     import matplotlib.pyplot as plt
 
-    from model.utils.augmentations import DeNormalize, get_transform
-    from model.utils.geometry import decode
-
-    dim = 300
-    model = make_ssd()
-    model_state = torch.load(model_ch, map_location=torch.device('cpu'))
-    model.load_state_dict(model_state, strict=False)
-    p = Path('/Users/fredrikg/Projects/pollendb1/data/test')
-    trf = Path('/Users/fredrikg/Projects/pollendb1/data/annotations/test.pkl')
-    train_labels = pickle.load(trf.open('rb'))
-    boxes = train_labels[name]
-    labels = torch.ones(len(boxes))
-    img = Image.open(p / name)
-
-    denorm = DeNormalize()
-    transform = get_transform(train=False)
-
-    img, boxes, labels = transform(img, boxes, labels)
-    model.eval()
-    with torch.no_grad():
-        ploc, pconf, _ = model(img.unsqueeze(0))
-        print('done out')
-        out_boxes = decode(model.priors, ploc, pconf, [0.1, 0.2])[0]
-        print(out_boxes)
-    img, *_ = denorm(img, boxes, labels)
-    boxes = np.clip(patch_boxes(boxes.numpy()) * dim, 0, dim)
-    out_boxes = np.clip(patch_boxes(out_boxes[0].numpy()) * dim, 0, dim)
-
-    _, ax = plt.subplots()
-    ax.imshow(to_plt_img(img), interpolation='none')
-    # ax.set_title('Subsample')
-    for *xy, w, h in boxes:
-        ax.add_patch(patches.Rectangle(xy, w, h, edgecolor='green', fill=False))
-    for *xy, w, h in out_boxes:
-        ax.add_patch(patches.Rectangle(xy, w, h, edgecolor='red', fill=False))
-    ax.set_axis_off()
-    plt.show()
-
-
-def infer2():
-    import matplotlib.patches as patches
-    import matplotlib.pyplot as plt
-
-    from model.utils.augmentations import DeNormalize
+    from model.utils.annotate import annotate_detection
 
     root = Path('/Users/fredrikg/Pictures/pollen_astma/')
     transform = SSDAugmentation(train=False)
     dataset = AstmaDataset(root, 'test', transform)
-    colors = {
-        'poaceae': (0.890625, 0.101562, 0.101562),
-        'corylus': (0.215686, 0.494118, 0.721569),
-        'alnus': (0.301961, 0.686275, 0.290196),
-        'misc': (0.596078, 0.305882, 0.639216),
-        'unknown': (0.54902, 0.337255, 0.294118),
-    }
 
-    dim = 300
     model = make_ssd(phase='test', num_classes=len(dataset.labels) + 1)
-    model_state = torch.load(model_ch, map_location=torch.device('cpu'))
-    model.load_state_dict(model_state, strict=False)
+    state = torch.load(model_ch, map_location=torch.device('cpu'))
+    model.load_state_dict(state['model_state_dict'], strict=True)
 
     lens = [len(dataset.bboxes[n]) for n in dataset.images]
     sorted = np.argsort(lens)[::-1]
 
-    img, targets = dataset[sorted[0]]
-    boxes, labels = targets[:, :4], targets[:, 4]
-    denorm = DeNormalize()
-    print(f'targets>\n{boxes}')
+    img, targets = dataset[sorted[10]]
+    # print(f'targets>\n{targets[:, :4]}')
     model.eval()
     with torch.no_grad():
         detections = model(img.unsqueeze(0))
-    out = []
-    for i in [1, 2, 3]:
-        dets = detections[0, i, ...]  # only one class which is nr. 1
-        mask = dets[:, 0].gt(0.0)
-        dets = dets[mask, ...]
-        out.append(dets.data)
 
-    img, _, labels = denorm(img, boxes, labels)
-    print(f'predictions>\n{out}')
-    boxes = np.clip(patch_boxes(boxes.numpy()) * dim, 0, dim)
-    out_bbox = [np.clip(patch_boxes(b[:, 1:].numpy()) * dim, 0, dim) for b in out]
-    out_conf = [b[:, 0].numpy() for b in out]
-
-    _, ax = plt.subplots()
-    ax.imshow(to_plt_img(img), interpolation='none')
-    # ax.set_title('Subsample')
-
-    offsets = {
-        'gt': lambda xy, w, h: (xy[0] + (w // 2), xy[1] + (h // 2)),
-        'poaceae': lambda xy, w, h: (xy[0], xy[1] + h + 10),
-        'corylus': lambda xy, w, h: (xy[0] + w, xy[1]),
-        'alnus': lambda xy, w, h: (xy[0] + w, xy[1] + h + 10),
-    }
-
-    for (*xy, w, h), l in zip(boxes, labels.int().tolist()):
-        ax.add_patch(patches.Rectangle(xy, w, h, edgecolor='green', fill=False))
-        ax.text(*offsets['gt'](xy, w, h), dataset.labels[l], color='green', fontsize=10)
-    for lab, boxes, confs in zip(dataset.labels, out_bbox, out_conf):
-        for (*xy, w, h), c in zip(boxes, confs):
-            if not confs.size:
-                continue
-            ax.add_patch(patches.Rectangle(xy, w, h, edgecolor=colors[lab], fill=False))
-            ax.text(
-                *offsets[lab](xy, w, h),
-                f'{lab} {c:.2f}',
-                color=colors[lab],
-                fontsize=10,
-            )
-    ax.set_axis_off()
-    plt.show()
+    annotate_detection(img, targets, detections, dataset.labels)
 
 
 def test_encoder(name):
@@ -317,7 +225,7 @@ if __name__ == "__main__":
     # show_img('0090_108.jpg')
     # data_pipeline()
     # run_model()
-    infer2()  # '0034_076.jpg' '0063_131.jpg'
+    infer()  # '0034_076.jpg' '0063_131.jpg'
     # test_encoder('0056_112.jpg')
     # test_crit(['0114_171.jpg', '0403_055.jpg', '0090_108.jpg'])
     # evaluate_model()
