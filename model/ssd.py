@@ -6,7 +6,7 @@ from torch import Tensor
 import torch.nn as nn
 from torchvision.models.resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 
-from priors import priors
+from priors import PriorBox
 
 Modules = List[nn.Module]
 
@@ -72,7 +72,8 @@ class SSD(nn.Module):
         self.num_classes = cfg['num_classes']
         self.size = cfg['size']
         self.default_boxes = cfg['default_boxes']
-        self.priors = nn.Parameter(priors(), requires_grad=False)
+        priors = PriorBox()
+        self.priors = nn.Parameter(priors.forward(), requires_grad=False)
 
         self.base: ResNet = base
         self.extra = self._extra_layers(base.out_channels)

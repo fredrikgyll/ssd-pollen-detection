@@ -18,6 +18,13 @@ def priors() -> torch.Tensor:
     steps = [8, 16, 32, 64, 100, 300]
     scales = [21, 45, 99, 153, 207, 261, 315]
     aspect_ratios = [[2], [2, 3], [2, 3], [2, 3], [2], [2]]
+
+    # 5776 boxes layer 1 (5776)
+    # 2166 boxes layer 2 (7942)
+    #  600 boxes layer 3 (8542)
+    #  150 boxes layer 4 (8692)
+    #   36 boxes layer 5 (8728)
+    #    4 boxes layer 6 (8732)
     """
     fig_size = 300
     feat_size = [38, 19, 10, 5, 3, 1]
@@ -44,3 +51,61 @@ def priors() -> torch.Tensor:
                 locations.append((cx, cy, w, h))
     dboxes = torch.tensor(locations, dtype=torch.float)
     return dboxes
+
+
+class PriorBox(object):
+    """Compute priorbox coordinates in center-offset form for each source
+    feature map.
+    """
+
+    def __init__(self):
+        super(PriorBox, self).__init__()
+        self.image_size = 300
+        self.aspect_ratios = [[2], [2, 3], [2, 3], [2, 3], [2], [2]]
+        # number of priors for feature map location (either 4 or 6)
+        self.num_priors = len(self.aspect_ratios)
+        self.variance = [0.1, 0.2]
+        self.feature_maps = [38, 19, 10, 5, 3, 1]
+        self.min_sizes = [30, 60, 111, 162, 213, 264]
+        self.max_sizes = [60, 111, 162, 213, 264, 315]
+        self.steps = [8, 16, 32, 64, 100, 300]
+
+        self.clip = True
+        self.version = 'VOC'
+        for v in self.variance:
+            if v <= 0:
+                raise ValueError('Variances must be greater than 0')
+
+    def forward(self):
+        mean = []
+        for k, f in enumerate(self.feature_maps):
+            s_k = self.min_sizes[k] / self.image_size
+            s_k_prime = sqrt(s_k * (self.max_sizes[k] / self.image_size))
+            f_k = self.image_size / self.steps[k]
+
+            boxes = [[s_k, s_k], [s_k_prime, s_k_prime]]
+            for ar in self.aspect_ratios[k]:
+                w, h = s_k * sqrt(ar), s_k / sqrt(ar)
+                boxes.append([w, h])
+                boxes.append([h, w])
+            for default_w, default_h in boxes:
+
+                for i, j in product(range(f), repeat=2):
+                    # unit center x,y
+                    cx = (j + 0.5) / f_k
+                    cy = (i + 0.5) / f_k
+                    mean.append([cx, cy, default_w, default_h])
+
+        # back to torch land
+        output = torch.tensor(mean, dtype=torch.float)
+        if self.clip:
+            output.clamp_(max=1, min=0)
+        return output
+
+
+# 5776 boxes layer 1 (5776)
+# 2166 boxes layer 2 (7942)
+#  600 boxes layer 3 (8542)
+#  150 boxes layer 4 (8692)
+#   36 boxes layer 5 (8728)
+#    4 boxes layer 6 (8732)
