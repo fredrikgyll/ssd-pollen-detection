@@ -236,7 +236,7 @@ if __name__ == "__main__":
     cfg = dict(
         size=300,
         num_classes=num_classes,
-        layer_activation=[True, True, True, True, True, False],
+        layer_activation=[True, True, True, False, False, False],
         default_boxes=[4, 6, 6, 6, 4, 4],
         variances=[0.1, 0.2],
     )

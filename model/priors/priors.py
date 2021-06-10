@@ -17,8 +17,8 @@ class PriorBox:
         self.aspect_ratios = [[2], [2, 3], [2, 3], [2, 3], [2], [2]]
         # number of priors for feature map location (either 4 or 6)
         self.feature_maps = [38, 19, 10, 5, 3, 1]
-        self.min_sizes = [30, 60, 111, 162, 213, 264]
-        self.max_sizes = [60, 111, 162, 213, 264, 315]
+        self.min_sizes = [30, 40, 60, 100, 150, 200]
+        self.max_sizes = [40, 60, 100, 150, 200, 264]
         self.steps = [8, 16, 32, 64, 100, 300]
 
         self.clip = True
