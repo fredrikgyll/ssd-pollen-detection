@@ -109,9 +109,9 @@ class SSD(nn.Module):
             loc.append(l(x).view(x.size(0), 4, -1))
             conf.append(c(x).view(x.size(0), self.num_classes, -1))
         # dims: batch, offsets/class scale-row-col-aspect
-        loc_tensor: Tensor = torch.cat(loc, 2).contiguous()
-        conf_tensor: Tensor = torch.cat(conf, 2).contiguous()
-        return loc_tensor, conf_tensor
+        loc_tensor: Tensor = torch.cat(loc, 2).transpose(1, 2).contiguous()
+        conf_tensor: Tensor = torch.cat(conf, 2).transpose(1, 2).contiguous()
+        return loc_tensor, conf_tensor, self.priors
 
     def _extra_layers(self, in_channels: List[int]) -> nn.ModuleList:
         # Extra layers for feature scaling

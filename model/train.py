@@ -106,7 +106,9 @@ def train(args):
     )
     scheduler = MultiStepLR(optimizer=optimizer, milestones=args.multistep, gamma=0.1)
 
-    criterion = MultiBoxLoss(ssd_net.priors, cfg['variances'], batch_size)
+    criterion = MultiBoxLoss(
+        cfg['num_classes'], 0.5, True, 0, True, 3, 0.5, False, args.cuda
+    )
     if args.cuda:
         ssd_net = ssd_net.cuda()
         criterion = criterion.cuda()
@@ -125,26 +127,18 @@ def train(args):
         epoch_loss = []
         t1 = time.time()
         for bidx, batch in enumerate(data_loader):
-            with set_default_tensor_type(torch.cuda.FloatTensor):
-                images, targets, labels = batch.data()
-                target_boxes = []
-                target_labels = []
-                for truth, label in zip(targets, labels):
-                    if args.cuda:
-                        truth, label = truth.cuda(), label.cuda()
-                    target_box, target_label = encode(ssd_net.priors, truth, label)
-                    target_boxes.append(target_box)
-                    target_labels.append(target_label)
-                gloc = torch.stack(target_boxes, dim=0)
-                glabel = torch.stack(target_labels, dim=0).long()
+            with set_default_tensor_type(torch.FloatTensor):
+                images, targets = batch.data()
 
                 if args.cuda:
                     images = images.cuda()
 
-                ploc, pconf = ssd_net(images)
+                out = ssd_net(images)
+                # [print(x.size()) for x in out]
+                # backprop
                 optimizer.zero_grad()
-
-                loss = criterion(ploc, pconf, gloc, glabel)
+                loss_l, loss_c = criterion(out, targets)
+                loss = loss_l + loss_c
             loss.backward()
             optimizer.step()
             scheduler.step()
@@ -157,7 +151,7 @@ def train(args):
 
         elapsed = int(time.time() - t1)
         total_elapsed = int(time.time() - t0)
-        eta = (total_elapsed / (i + 1)) * (args.epochs - i - 1)
+        eta = int((total_elapsed / (i + 1)) * (args.epochs - i - 1))
         loss_hist.extend(epoch_loss)
         if (i + 1) % 10 == 0:
             torch.save(ssd_net.state_dict(), save_dir / f'ssd_epoch_{i:02d}.pth')
