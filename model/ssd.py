@@ -113,24 +113,23 @@ class SSD(nn.Module):
         conf: List[Tensor] = []
         for x, l, c in zip(source_layers, self.loc_head, self.conf_head):
             # dims: batch, row, col, class/offset per aspect
-            loc.append(l(x).permute(0, 2, 3, 1).contiguous())
-            conf.append(c(x).permute(0, 2, 3, 1).contiguous())
+            loc.append(l(x).view(x.size(0), 4, -1))
+            conf.append(c(x).view(x.size(0), self.num_classes, -1))
+
         # dims: batch, offsets/class scale-row-col-aspect
-        loc_tensor = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
-        conf_tensor = torch.cat([o.view(o.size(0), -1) for o in conf], 1)
+        loc_tensor: Tensor = torch.cat(loc, 2).transpose(1, 2).contiguous()
+        conf_tensor: Tensor = torch.cat(conf, 2).transpose(1, 2).contiguous()
 
         if self.phase == "train":
             output = (
-                loc_tensor.view(loc_tensor.size(0), -1, 4),
-                conf_tensor.view(conf_tensor.size(0), -1, self.num_classes),
+                loc_tensor,
+                conf_tensor,
                 self.priors,
             )
         else:
             output = self.detect(
-                loc_tensor.view(loc_tensor.size(0), -1, 4),  # loc preds
-                F.softmax(
-                    conf_tensor.view(conf_tensor.size(0), -1, self.num_classes), dim=-1
-                ),
+                loc_tensor,  # loc preds
+                F.softmax(conf_tensor, dim=-1),
                 self.priors.type_as(x),  # default boxes
             )
         return output

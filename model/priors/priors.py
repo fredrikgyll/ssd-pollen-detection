@@ -53,7 +53,7 @@ def priors() -> torch.Tensor:
     return dboxes
 
 
-class PriorBox(object):
+class PriorBox:
     """Compute priorbox coordinates in center-offset form for each source
     feature map.
     """
@@ -76,7 +76,7 @@ class PriorBox(object):
             if v <= 0:
                 raise ValueError('Variances must be greater than 0')
 
-    def myforward(self):
+    def forward(self) -> torch.Tensor:
         mean = []
         for k, f in enumerate(self.feature_maps):
             s_k = self.min_sizes[k] / self.image_size
@@ -97,12 +97,12 @@ class PriorBox(object):
                     mean.append([cx, cy, default_w, default_h])
 
         # back to torch land
-        output = torch.tensor(mean, dtype=torch.float)
+        output = torch.tensor(mean)
         if self.clip:
             output.clamp_(max=1, min=0)
         return output
 
-    def forward(self):
+    def amdforward(self) -> torch.Tensor:
         mean = []
         for k, f in enumerate(self.feature_maps):
             for i, j in product(range(f), repeat=2):
