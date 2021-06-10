@@ -15,7 +15,10 @@ class HDF5Dataset:
     ) -> None:
         self.transform = transform
         self.data_file = root
-        self.labels = ['poaceae', 'corylus', 'alnus']
+        self.labels = {
+            'balanced1': ['poaceae', 'corylus', 'alnus'],
+            'poaceae1': ['poaceae'],
+        }[dataset]
 
         with h5py.File(self.data_file, 'r') as pollendb:
             self.names = list(pollendb[f'datasets/{dataset}/{mode}'][()])
@@ -61,12 +64,15 @@ class HDF5Dataset:
 
 
 class AstmaDataset:
-    def __init__(self, root: Path, name: str, mode: str, transform) -> None:
+    def __init__(self, root: Path, dataset: str, mode: str, transform) -> None:
         self.transform = transform
         self.bboxes = pickle.loads((root / 'annotations/all.pkl').read_bytes())
-        self.images = json.loads((root / f'datasets/{name}.json').read_text())[mode]
+        self.images = json.loads((root / f'datasets/{dataset}.json').read_text())[mode]
         self.image_dir = root / 'Images'
-        self.labels = ['poaceae', 'corylus', 'alnus']
+        self.labels = {
+            'balanced1': ['poaceae', 'corylus', 'alnus'],
+            'poaceae1': ['poaceae'],
+        }[dataset]
 
     def __getitem__(self, idx):
         file = self.images[idx]
