@@ -21,15 +21,13 @@ parser.add_argument(
 )
 # argparse receiving list of classes to be ignored (e.g., python main.py --ignore person book)
 parser.add_argument(
-    "-i", "--ignore", nargs="+", default=[] type=str, help="ignore a list of classes."
+    "-i", "--ignore", nargs="+", default=[], type=str, help="ignore a list of classes."
 )
 # argparse receiving list of classes with specific IoU (e.g., python main.py --set-class-iou person 0.7)
 parser.add_argument(
     "--set-class-iou", nargs="+", type=str, help="set IoU for a specific class."
 )
-parser.add_argument(
-    "-f", "--input", type=str, help="input folder"
-)
+parser.add_argument("-f", "--input", type=str, help="input folder")
 args = parser.parse_args()
 
 """
@@ -53,10 +51,10 @@ specific_iou_flagged = args.set_class_iou is not None
 
 ROOT = Path(args.input)
 
-GT_PATH: Path = root / 'ground-truth'
-DR_PATH: Path = root / 'detection-results'
+GT_PATH: Path = ROOT / 'ground-truth'
+DR_PATH: Path = ROOT / 'detection-results'
 # if there are no images then no animation can be shown
-IMG_PATH: Path = root / 'images-optional'
+IMG_PATH: Path = ROOT / 'images-optional'
 
 
 def log_average_miss_rate(prec, rec, num_images):
@@ -198,14 +196,13 @@ def file_lines_to_list(path):
     return content
 
 
-
 """
  Create a .temp_files/ and output/ directory
 """
-TEMP_FILES_PATH: Path = root / '.temp_files'
+TEMP_FILES_PATH: Path = ROOT / '.temp_files'
 TEMP_FILES_PATH.mkdir(exist_ok=True)
 
-output_files_path: Path = root / 'output'
+output_files_path: Path = ROOT / 'output'
 if output_files_path.is_dir():
     # reset the output directory
     shutil.rmtree(output_files_path)
@@ -295,7 +292,7 @@ for txt_file in ground_truth_files_list:
                 already_seen_classes.append(class_name)
 
     # dump bounding_boxes into a ".json" file
-    new_temp_file = TEMP_FILES_PATH + "/" + file_id + "_ground_truth.json"
+    new_temp_file = TEMP_FILES_PATH / (file_id + "_ground_truth.json")
     gt_files.append(new_temp_file)
     with open(new_temp_file, "w") as outfile:
         json.dump(bounding_boxes, outfile)
@@ -368,7 +365,7 @@ for class_index, class_name in enumerate(gt_classes):
                 # print(bounding_boxes)
     # sort detection-results by decreasing confidence
     bounding_boxes.sort(key=lambda x: float(x["confidence"]), reverse=True)
-    with open(TEMP_FILES_PATH + "/" + class_name + "_dr.json", "w") as outfile:
+    with open(TEMP_FILES_PATH / (class_name + "_dr.json"), "w") as outfile:
         json.dump(bounding_boxes, outfile)
 
 """
@@ -378,7 +375,7 @@ sum_AP = 0.0
 ap_dictionary = {}
 lamr_dictionary = {}
 # open file to store the output
-with open(output_files_path + "/output.txt", "w") as output_file:
+with open(output_files_path / "output.txt", "w") as output_file:
     output_file.write("# AP and precision/recall per class\n")
     count_true_positives = {}
     for class_index, class_name in enumerate(gt_classes):
@@ -386,7 +383,7 @@ with open(output_files_path + "/output.txt", "w") as output_file:
         """
          Load detection-results of that class
         """
-        dr_file = TEMP_FILES_PATH + "/" + class_name + "_dr.json"
+        dr_file = TEMP_FILES_PATH / (class_name + "_dr.json")
         dr_data = json.load(open(dr_file))
 
         """
@@ -399,7 +396,7 @@ with open(output_files_path + "/output.txt", "w") as output_file:
             file_id = detection["file_id"]
             # assign detection-results to ground truth object if any
             # open ground-truth with that file_id
-            gt_file = TEMP_FILES_PATH + "/" + file_id + "_ground_truth.json"
+            gt_file = TEMP_FILES_PATH / (file_id + "_ground_truth.json")
             ground_truth_data = json.load(open(gt_file))
             ovmax = -1
             gt_match = -1
@@ -455,7 +452,6 @@ with open(output_files_path + "/output.txt", "w") as output_file:
                 if ovmax > 0:
                     status = "INSUFFICIENT OVERLAP"
 
-
         # print(tp)
         # compute precision/recall
         cumsum = 0
@@ -502,7 +498,6 @@ with open(output_files_path + "/output.txt", "w") as output_file:
         lamr, mr, fppi = log_average_miss_rate(np.array(prec), np.array(rec), n_images)
         lamr_dictionary[class_name] = lamr
 
-
     output_file.write("\n# mAP of all classes\n")
     mAP = sum_AP / n_classes
     text = "mAP = {0:.2f}%".format(mAP * 100)
@@ -539,7 +534,7 @@ dr_classes = list(det_counter_per_class.keys())
 """
  Write number of ground-truth objects per class to results.txt
 """
-with open(output_files_path + "/output.txt", "a") as output_file:
+with open(output_files_path / "output.txt", "a") as output_file:
     output_file.write("\n# Number of ground-truth objects per class\n")
     for class_name in sorted(gt_counter_per_class):
         output_file.write(
@@ -559,7 +554,7 @@ for class_name in dr_classes:
 """
  Write number of detected objects per class to output.txt
 """
-with open(output_files_path + "/output.txt", "a") as output_file:
+with open(output_files_path / "output.txt", "a") as output_file:
     output_file.write("\n# Number of detected objects per class\n")
     for class_name in sorted(dr_classes):
         n_det = det_counter_per_class[class_name]
@@ -567,4 +562,3 @@ with open(output_files_path + "/output.txt", "a") as output_file:
         text += " (tp:" + str(count_true_positives[class_name]) + ""
         text += ", fp:" + str(n_det - count_true_positives[class_name]) + ")\n"
         output_file.write(text)
-
