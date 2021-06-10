@@ -174,13 +174,17 @@ class SSD(nn.Module):
 
 
 def make_ssd(
-    num_classes: int = 2, backbone: str = 'resnet34', phase: str = 'train'
+    num_classes: int = 2,
+    backbone: str = 'resnet34',
+    backbone_path=None,
+    phase='train',
+    cfg=None,
 ) -> SSD:
-    cfg = dict(
+    ssd_cfg = cfg or dict(
         size=300,
         num_classes=num_classes,
         default_boxes=[4, 6, 6, 6, 4, 4],
         variances=[0.1, 0.2],
     )
-    base = ResNet(backbone=backbone)
-    return SSD(base, cfg, phase=phase)
+    base = ResNet(backbone=backbone, backbone_path=backbone_path)
+    return SSD(base, ssd_cfg, phase=phase)
