@@ -5,6 +5,7 @@ import argparse
 from pathlib import Path
 import datetime
 import numpy as np
+from pprint import pformat
 
 import torch
 import torch.utils.data as data
@@ -70,8 +71,11 @@ def set_default_tensor_type(tensor_type):
 def train(args):
     run_id = datetime.datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
     save_dir = args.save / run_id
-    logger = Logger(save_dir)
     save_dir.mkdir()
+    logger = Logger(save_dir)
+    logger(f'ID {run_id}')
+    logger('Parameters:')
+    logger(pformat(vars(args), indent=4))
     batch_size = args.batch_size
 
     # Data
@@ -166,7 +170,7 @@ def train(args):
     torch.save(ssd_net.state_dict(), save_dir / 'ssd_last.pth')
     pickle.dump(loss_hist, loss_file.open('wb'))
     logger('====== FINISH ======')
-    print(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
+    logger(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
 
 
 if __name__ == "__main__":
