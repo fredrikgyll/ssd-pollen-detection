@@ -14,38 +14,33 @@ from model.utils.augmentations import SSDAugmentation
 from model.utils.data import HDF5Dataset
 from model.utils.geometry import jaccard
 
-parser = argparse.ArgumentParser(description='Evaluate SSD300 model')
 
-parser.add_argument('--checkpoint', '-c', type=Path, help='Path to model checkpoint')
-parser.add_argument('--data', '-d', type=Path, help='path to data directory')
-parser.add_argument('--output', '-o', type=Path, help='Path to save folder')
-parser.add_argument(
-    '--cuda', action='store_true', help='Train model on cuda enabled GPU'
-)
+def interpolate(precision, recall):
+    """Return list of 11-point interpolation points
+    :param precision: precision by rising recall
+    :param recall: monotonically increasing recall levels
+    :returns: list of 11-point interpolation
+    """
+    pre = np.append(precision, 0.0)
+    rec = np.append(recall, 1.0)
+    interpolation = []
+    for p in np.linspace(0, 1, 11):
+        interpolation.append(np.max(pre[rec >= p]))
+    return np.array(interpolation)
 
-CLASSES = ['poaceae', 'corylus', 'alnus', 'unknown']
 
-if __name__ == "__main__":
-    args = parser.parse_args()
+def evaluate(model, dataset, class_subset, cuda=False, quiet=True):
+    length = len(dataset)
 
     n_gth = defaultdict(int)
     predictions = defaultdict(list)
     confidences = defaultdict(list)
 
-    transforms = SSDAugmentation(train=False)
-    dataset = HDF5Dataset(args.data, 'balanced1', 'test', transforms)
-
-    model = make_ssd(phase='test', num_classes=len(dataset.labels) + 1)
-    model_state = torch.load(args.checkpoint, map_location=torch.device('cpu'))
-    model.load_state_dict(model_state, strict=True)
-
-    length = len(dataset)
-
     model.eval()
-    if args.cuda:
+    if cuda:
         model = model.cuda()
 
-    for i in tqdm(range(length)):
+    for i in tqdm(range(length), disable=quiet):
         file = dataset.names[i]
         try:
             image, targets = dataset[i]
@@ -53,11 +48,13 @@ if __name__ == "__main__":
             print('error:', i, file)
             continue
         with torch.no_grad():
-            if args.cuda:
+            if cuda:
                 image = image.cuda()
                 targets = targets.cuda()
             detections = model(image.unsqueeze(0))
-            for j, name in enumerate(CLASSES):
+            for j, name in enumerate(dataset.labels):
+                if name not in class_subset:
+                    continue  # skip classes
                 truth = targets[targets[:, 4] == j, :4]
                 n_gth[name] += len(truth)
                 dets = detections[0, j + 1, ...]  # 0 is bkg_label
@@ -74,20 +71,59 @@ if __name__ == "__main__":
                             preds[tp[0]] = 1
                     predictions[name].append(preds)
                     confidences[name].append(sorted_conf)
-    out = {}
-    for name in CLASSES:
-        preds = torch.cat(predictions[name], dim=0)
+    metrics = {}
+    for name in class_subset:
+        true_pos = torch.cat(predictions[name], dim=0)
         confs = torch.cat(confidences[name], dim=0)
         _, order = confs.sort(descending=True)
-        preds_cum = torch.cumsum(preds[order], dim=0).cpu().numpy()
+        true_pos_cum = torch.cumsum(true_pos[order], dim=0).cpu().numpy()
 
-        out[name] = {
-            'precision': preds_cum / np.arange(1, preds_cum.size + 1),
-            'recall': preds_cum / n_gth[name],
+        precision = true_pos_cum / np.arange(1, true_pos_cum.size + 1)
+        recall = true_pos_cum / n_gth[name]
+        interpolation = interpolate(precision, recall)
+        metrics[name] = {
+            'precision': precision,
+            'recall': recall,
+            'interpolation': interpolation,
+            'average_precision': np.mean(interpolation),
             'ground_truths': n_gth[name],
-            'total_detections': preds.size(0),
-            'tp': (preds == 1).sum().item(),
+            'total_detections': true_pos.size(0),
+            'tp': true_pos.sum().item(),
             'fp': (preds == 0).sum().item(),
         }
 
-    (args.output / 'map.pkl').write_bytes(pickle.dumps(out))
+    return metrics
+
+
+if __name__ == "__main__":
+    CLASSES = ['poaceae', 'corylus', 'alnus', 'unknown']
+
+    parser = argparse.ArgumentParser(description='Evaluate SSD300 model')
+
+    parser.add_argument(
+        '--checkpoint', '-c', type=Path, help='Path to model checkpoint'
+    )
+    parser.add_argument('--data', '-d', type=Path, help='path to data directory')
+    parser.add_argument(
+        '--output',
+        '-o',
+        type=Path,
+        detault=Path('./metrics.plk'),
+        help='Path to save evaluation',
+    )
+    parser.add_argument(
+        '--cuda', action='store_true', help='Train model on cuda enabled GPU'
+    )
+
+    args = parser.parse_args()
+
+    transforms = SSDAugmentation(train=False)
+    dataset = HDF5Dataset(args.data, 'balanced1', 'test', transforms)
+
+    model = make_ssd(phase='test', num_classes=len(dataset.labels) + 1)
+    model_state = torch.load(args.checkpoint, map_location=torch.device('cpu'))
+    model.load_state_dict(model_state, strict=True)
+
+    metrics = evaluate(model, dataset, CLASSES, cuda=args.cuda, quiet=False)
+
+    args.output.write_bytes(pickle.dumps(metrics))
