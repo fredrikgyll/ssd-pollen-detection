@@ -2,10 +2,12 @@ from contextlib import contextmanager
 import pickle
 import time
 import argparse
+import os
 from pathlib import Path
 import datetime
 import numpy as np
 from pprint import pformat
+from dotenv import load_dotenv
 
 import torch
 import torch.utils.data as data
@@ -54,6 +56,9 @@ parser.add_argument(
     default=[40, 55],
     help='epochs at which to decay learning rate',
 )
+parser.add_argument(
+    '--push', action='store_true', help='Push final model to bunnyCDN'
+)
 
 
 @contextmanager
@@ -66,6 +71,11 @@ def set_default_tensor_type(tensor_type):
     torch.set_default_tensor_type(tensor_type)
     yield
     torch.set_default_tensor_type(old_tensor_type)
+
+def push_file(api_key: str, run_id:str, pth: Path):
+    from utils.bunny import CDNConnector
+    conn = CDNConnector(api_key, 'pollen')
+    conn.upload_file('models/', pth, file_name=run_id + '.pth')
 
 
 def train(args):
@@ -167,14 +177,20 @@ def train(args):
         logger(f"ETA:\t{datetime.timedelta(seconds=eta)}")
     elapsed = int(time.time() - t0)
     loss_file = save_dir / 'loss_hist.pkl'
-    torch.save(ssd_net.state_dict(), save_dir / 'ssd_last.pth')
+    last_model_path = save_dir / 'ssd_last.pth'
+    torch.save(ssd_net.state_dict(), last_model_path)
     pickle.dump(loss_hist, loss_file.open('wb'))
     logger('====== FINISH ======')
     logger(f"Time:\t{datetime.timedelta(seconds=elapsed)}")
-
+    if args.push:
+        logger('Pushing file to bunny...')
+        push_file(os.getenv('BUNNY_API_KEY'), run_id, last_model_path)
+        logger('Done.')
+    
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    load_dotenv()
     if args.viz:
         print("plotting")
         global plotter
