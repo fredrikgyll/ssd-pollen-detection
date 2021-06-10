@@ -94,6 +94,39 @@ class RandomSubSample:
                 break
         return sub_img, new_boxes[in_bound], labels[in_bound]
 
+class StaticSubSample:
+    def __init__(self, out_dim: int = 300, tolerance: int = 10) -> None:
+        self.out_dim = out_dim
+        self.tolerance = tolerance
+
+    def __call__(self, image, boxes, labels):
+        # print(image.shape)
+        assert image.size(0) == 3
+        dims = np.array(image.shape[1:])  # h, w
+        out = self.out_dim
+
+        if dims[0] == out and dims[1] == out:
+            return image, boxes, labels
+        deltas = dims - out
+        h, w = 0, 0
+        while True:
+            w += 50
+            if w >= deltas[1]:
+                w = 0
+                h += 50
+                if h >= deltas[0]:
+                    raise ValueError('Could not find valid SubSample')
+            sub_img = image[..., h : h + out, w : w + out]
+            new_boxes = boxes.copy()
+            new_boxes[:, ::2] -= w
+            new_boxes[:, 1::2] -= h
+            in_bound = (new_boxes[:, :2] > -self.tolerance) & (
+                new_boxes[:, 2:] < (self.out_dim + self.tolerance)
+            )
+            in_bound = in_bound.all(axis=1)
+            if in_bound.any():
+                break
+        return sub_img, new_boxes[in_bound], labels[in_bound]
 
 class HorizontalFlip:
     def __init__(self, p: float = 0.5) -> None:
@@ -173,7 +206,7 @@ class SSDAugmentation(object):
             transforms = [
                 CV2Tensor(),  # boxes _ -> _
                 Normalize(),  # boxes _ -> _
-                RandomSubSample(out_dim=500),  # boxes abs -> abs
+                StaticSubSample(out_dim=500),  # boxes abs -> abs
                 ToPercentCoords(),  # boxes abs -> %
                 Resize(size=self.size),  # boxes % -> %
                 TargetsToTensor(),  # boxes _ -> _
