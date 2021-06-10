@@ -48,8 +48,11 @@ if __name__ == "__main__":
 
     for i in tqdm(range(length)):
         file = dataset.names[i]
-        image, targets = dataset[i]
-
+        try:
+            image, targets = dataset[i]
+        except:
+            print('error:', i, file)
+            continue
         with torch.no_grad():
             if args.cuda:
                 image = image.cuda()

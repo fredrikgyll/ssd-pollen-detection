@@ -40,8 +40,8 @@ if __name__ == "__main__":
 
     det_dir = args.output / 'detection-results'
     gt_dir = args.output / 'ground-truth'
-    det_dir.mkdir(exist_ok=True)
-    gt_dir.mkdir(exist_ok=True)
+    det_dir.mkdir(parents=True, exist_ok=True)
+    gt_dir.mkdir(parents=True, exist_ok=True)
 
     dim = 300
 
@@ -60,7 +60,11 @@ if __name__ == "__main__":
 
     for i in tqdm(range(length)):
         file = dataset.names[i]
-        image, targets = dataset[i]
+        try:
+            image, targets = dataset[i]
+        except:
+            print('error:', i, file)
+            continue
         gt_lines = [
             f'{CLASSES[gt[4]]} {" ".join(str(x) for x in gt[:4])}'
             for gt in clean_gt(targets, dim)

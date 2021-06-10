@@ -94,6 +94,7 @@ class RandomSubSample:
                 break
         return sub_img, new_boxes[in_bound], labels[in_bound]
 
+
 class StaticSubSample:
     def __init__(self, out_dim: int = 300, tolerance: int = 10) -> None:
         self.out_dim = out_dim
@@ -110,12 +111,6 @@ class StaticSubSample:
         deltas = dims - out
         h, w = 0, 0
         while True:
-            w += 50
-            if w >= deltas[1]:
-                w = 0
-                h += 50
-                if h >= deltas[0]:
-                    raise ValueError('Could not find valid SubSample')
             sub_img = image[..., h : h + out, w : w + out]
             new_boxes = boxes.copy()
             new_boxes[:, ::2] -= w
@@ -126,7 +121,14 @@ class StaticSubSample:
             in_bound = in_bound.all(axis=1)
             if in_bound.any():
                 break
+            w += deltas[1] // 5
+            if w >= deltas[1]:
+                w = 0
+                h += deltas[0] // 5
+                if h >= deltas[0]:
+                    raise ValueError('Could not find valid SubSample')
         return sub_img, new_boxes[in_bound], labels[in_bound]
+
 
 class HorizontalFlip:
     def __init__(self, p: float = 0.5) -> None:
