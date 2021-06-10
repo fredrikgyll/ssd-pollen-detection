@@ -102,7 +102,7 @@ class Detect:
                     (scores[ids].unsqueeze(1), boxes[ids]), 1
                 )
         flt = output.contiguous().view(num, -1, 5)
-        if 0:
+        if 1:
             _, idx = flt[:, :, 0].sort(1, descending=True)
             _, rank = idx.sort(1)
             mask = rank >= self.top_k

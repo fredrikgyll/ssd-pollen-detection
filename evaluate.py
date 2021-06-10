@@ -16,13 +16,12 @@ from model.utils.evaluation import calculate_true_positives, evaluate, interpola
 
 
 def calc_dice(metrics, class_subset):
-    vals = []
+    tp, fp, fn = 0, 0, 0
     for k in class_subset:
-        tp = metrics[k]['tp']
-        fp = metrics[k]['fp']
-        fn = metrics[k]['ground_truths'] - tp
-        vals.append( tp / (tp + 0.5 * (fp + fn)))
-    return np.mean(vals)
+        tp += metrics[k]['tp']
+        fp += metrics[k]['fp']
+        fn += metrics[k]['ground_truths'] - tp
+    return tp / (tp + 0.5 * (fp + fn))
 
 
 def calc_map(metrics, class_subset):
