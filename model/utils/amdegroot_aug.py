@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import types
 from numpy import random
+from random import choice
 
 
 def intersect(box_a, box_b):
@@ -29,6 +30,16 @@ def jaccard_numpy(box_a, box_b):
     area_b = (box_b[2] - box_b[0]) * (box_b[3] - box_b[1])  # [A,B]
     union = area_a + area_b - inter
     return inter / union  # [A,B]
+
+
+class ToStandardForm:
+    def __call__(self, image, boxes, labels):
+        new_boxes = (
+            torch.cat((boxes[:, :2], boxes[:, 2:] + boxes[:, :2]), dim=1)
+            .float()
+            .numpy()
+        )
+        return image, new_boxes, labels
 
 
 class Compose(object):
@@ -203,7 +214,7 @@ class ToTensor(object):
     def __call__(self, cvimage, boxes=None, labels=None):
         return (
             f.to_tensor(cvimage),
-            boxes,
+            torch.from_numpy(boxes),
             labels,
         )
 
@@ -239,7 +250,7 @@ class RandomSampleCrop(object):
         height, width, _ = image.shape
         while True:
             # randomly choose a mode
-            mode = random.choice(self.sample_options)
+            mode = choice(self.sample_options)
             if mode is None:
                 return image, boxes, labels
 
@@ -405,8 +416,8 @@ class SSDAugmentation(object):
         self.size = size
         if train:
             transforms = [
+                ToStandardForm(),
                 ConvertFromInts(),
-                ToAbsoluteCoords(),
                 PhotometricDistort(),
                 Expand(self.mean),
                 RandomSampleCrop(),
@@ -418,6 +429,7 @@ class SSDAugmentation(object):
             ]
         else:
             transforms = [
+                ToStandardForm(),
                 ConvertFromInts(),
                 Resize(self.size),
                 SubtractMeans(self.mean),
