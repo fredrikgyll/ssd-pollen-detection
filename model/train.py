@@ -94,13 +94,12 @@ def train(args):
     cfg = dict(
         size=300, num_classes=2, default_boxes=[4, 6, 6, 6, 4, 4], variances=[0.1, 0.2]
     )
-    ssd_net = SSD(ResNet(backbone_path=args.weights), cfg)
+    ssd_net = SSD(ResNet(backbone='resnet34', backbone_path=args.weights), cfg)
     logger(f'Number of priors is {ssd_net.priors.size(0)}')
     logger(f'Number of extractor layers: {len(ssd_net.loc_head)+1}')
-    learning_rate = args.lr * (batch_size / 32)
     optimizer = SGD(
         ssd_net.parameters(),
-        lr=learning_rate,
+        lr=args.lr,
         momentum=args.momentum,
         weight_decay=args.weight_decay,
     )
@@ -127,11 +126,12 @@ def train(args):
         epoch_loss = []
         t1 = time.time()
         for bidx, batch in enumerate(data_loader):
-            with set_default_tensor_type(torch.FloatTensor):
+            with set_default_tensor_type(torch.cuda.FloatTensor):
                 images, targets = batch.data()
 
                 if args.cuda:
                     images = images.cuda()
+                    targets = [t.cuda() for t in targets]
 
                 out = ssd_net(images)
                 # [print(x.size()) for x in out]
