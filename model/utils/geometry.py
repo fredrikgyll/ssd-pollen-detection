@@ -175,7 +175,7 @@ def _linear_penelty(iou, scores, threshold=0.5, **kwargs):
 
 def _original_penelty(iou, scores, threshold=0.5, **kwargs):
     iou_mask = iou.le(threshold)
-    return scores, iou_mask
+    return scores[iou_mask], iou_mask
 
 
 def nms(

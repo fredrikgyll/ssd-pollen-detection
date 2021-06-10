@@ -112,13 +112,13 @@ class Detect:
                 keep, _ = nms(
                     b[:, 1:],
                     b[:, 0],
-                    overlap=0.9,
+                    overlap=0.7,
                     top_k=self.top_k,
                     sigma=0.15,
                     penelty='original',
                 )
                 if keep.numel():
-                    mask[i, keep] = False
+                    mask[j, keep] = False
         mask = (
             mask.unsqueeze(-1).expand_as(flt).view(num, self.num_classes, self.top_k, 5)
         )
