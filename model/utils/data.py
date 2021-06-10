@@ -2,41 +2,30 @@ import pickle
 import torch
 from pathlib import Path
 import cv2
-from .augmentations import TransformerSequence
-
-
-class APollene1Dataset:
-    def __init__(self, root: Path, mode: str, transform: TransformerSequence) -> None:
-        self.transform = transform
-        self.bboxes = pickle.load((root / f'annotations/{mode}.pkl').open('rb'))
-        self.image_dir = root / mode
-        self.images = list(sorted(self.bboxes.keys()))
-
-    def __getitem__(self, idx):
-        file = self.images[idx]
-        im = cv2.imread(str(self.image_dir / file))
-        bboxes = self.bboxes[file]
-        labels = torch.zeros(bboxes.size(0))
-        im, bboxes, labels = self.transform(im, bboxes, labels)
-        return im, bboxes, labels
-
-    def __len__(self):
-        return len(self.images)
+import numpy as np
 
 
 class Pollene1Dataset:
-    def __init__(self, root: Path, mode: str, transform: TransformerSequence) -> None:
+    def __init__(self, root: Path, mode: str, transform) -> None:
         self.transform = transform
-        self.bboxes = pickle.load((root / f'annotations/{mode}.pkl').open('rb'))
+        self.bboxes = pickle.load((root / f'annotations/new/{mode}.pkl').open('rb'))
         self.image_dir = root / mode
         self.images = list(sorted(self.bboxes.keys()))
+        self.dims = np.array([640, 512, 640, 512])
 
     def __getitem__(self, idx):
         file = self.images[idx]
-        im = cv2.imread(str(self.image_dir / file))
-        bboxes = self.bboxes[file]
-        labels = torch.zeros(bboxes.size(0))
-        im, bboxes, labels = self.transform(im, bboxes, labels)
+        img = cv2.imread(str(self.image_dir / file))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        target = self.bboxes[file]
+        target = target.astype(float)
+        target[:, :4] /= self.dims
+
+        self.transform(img, target[:, :4], target[:, 4])
+
+        im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
+
         target = torch.hstack((bboxes, labels.unsqueeze(1)))
         return im, target
 

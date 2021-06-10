@@ -4,9 +4,11 @@ from numpy.lib.utils import source
 import torch
 from torch import Tensor
 import torch.nn as nn
+import torch.nn.functional as F
 from torchvision.models.resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 
 from priors import PriorBox
+from utils.detection import Detect
 
 Modules = List[nn.Module]
 
@@ -66,7 +68,7 @@ class SSD(nn.Module):
         layer 5:     1, 4
     """
 
-    def __init__(self, base: ResNet, cfg):
+    def __init__(self, base: ResNet, cfg, phase: str = 'train'):
         super(SSD, self).__init__()
 
         self.num_classes = cfg['num_classes']
@@ -74,6 +76,7 @@ class SSD(nn.Module):
         self.default_boxes = cfg['default_boxes']
         priors = PriorBox()
         self.priors = nn.Parameter(priors.forward(), requires_grad=False)
+        self.phase = phase
 
         self.base: ResNet = base
         self.extra = self._extra_layers(base.out_channels)
@@ -86,6 +89,10 @@ class SSD(nn.Module):
             )
         self.loc_head = nn.ModuleList(_loc_layers)
         self.conf_head = nn.ModuleList(_conf_layers)
+
+        if phase == 'test':
+            self.softmax = nn.Softmax(dim=-1)
+            self.detect = Detect(self.num_classes, 0, 10, 0.01, 0.45, cfg['variances'])
 
     def _init_weights(self):
         layers = [*self.extra, *self.loc_head, *self.conf_head]
@@ -112,11 +119,21 @@ class SSD(nn.Module):
         loc_tensor = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
         conf_tensor = torch.cat([o.view(o.size(0), -1) for o in conf], 1)
 
-        return (
-            loc_tensor.view(loc_tensor.size(0), -1, 4),
-            conf_tensor.view(conf_tensor.size(0), -1, self.num_classes),
-            self.priors,
-        )
+        if self.phase == "train":
+            output = (
+                loc_tensor.view(loc_tensor.size(0), -1, 4),
+                conf_tensor.view(conf_tensor.size(0), -1, self.num_classes),
+                self.priors,
+            )
+        else:
+            output = self.detect(
+                loc_tensor.view(loc_tensor.size(0), -1, 4),  # loc preds
+                F.softmax(
+                    conf_tensor.view(conf_tensor.size(0), -1, self.num_classes), dim=-1
+                ),
+                self.priors.type_as(x),  # default boxes
+            )
+        return output
 
     def _extra_layers(self, in_channels: List[int]) -> nn.ModuleList:
         # Extra layers for feature scaling
@@ -149,11 +166,14 @@ class SSD(nn.Module):
         return nn.ModuleList(layers)
 
 
-def make_ssd(num_classes: int = 2) -> SSD:
+def make_ssd(
+    num_classes: int = 2, backbone: str = 'resnet34', phase: str = 'train'
+) -> SSD:
     cfg = dict(
         size=300,
         num_classes=num_classes,
         default_boxes=[4, 6, 6, 6, 4, 4],
+        variances=[0.1, 0.2],
     )
-    base = ResNet(backbone='resnet34')
-    return SSD(base, cfg)
+    base = ResNet(backbone=backbone)
+    return SSD(base, cfg, phase=phase)

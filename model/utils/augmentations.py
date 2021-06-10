@@ -136,19 +136,3 @@ class ColorSift:
                 image = t(image, fac)
             return image, boxes, labels
         return image, boxes, labels
-
-
-def get_transform(train: bool = True):
-    transforms = [
-        ToStandardForm(),
-        SubSample(640, 512),
-        Normalize(),
-    ]
-    if train:
-        transforms += [
-            VerticalFlip(),
-            HorizontalFlip(),
-            ColorSift(),
-            ChannelSuffle(),
-        ]
-    return TransformerSequence(*transforms)

@@ -1,10 +1,11 @@
-import torchvision.transforms.functional as f
-import torch
+import types
+from random import choice
+
 import cv2
 import numpy as np
-import types
+import torch
 from numpy import random
-from random import choice
+from torchvision import transforms
 
 
 def intersect(box_a, box_b):
@@ -32,16 +33,6 @@ def jaccard_numpy(box_a, box_b):
     return inter / union  # [A,B]
 
 
-class ToStandardForm:
-    def __call__(self, image, boxes, labels):
-        new_boxes = (
-            torch.cat((boxes[:, :2], boxes[:, 2:] + boxes[:, :2]), dim=1)
-            .float()
-            .numpy()
-        )
-        return image, new_boxes, labels
-
-
 class Compose(object):
     """Composes several augmentations together.
     Args:
@@ -53,8 +44,8 @@ class Compose(object):
         >>> ])
     """
 
-    def __init__(self, transforms):
-        self.transforms = transforms
+    def __init__(self, transf):
+        self.transforms = transf
 
     def __call__(self, img, boxes=None, labels=None):
         for t in self.transforms:
@@ -62,29 +53,8 @@ class Compose(object):
         return img, boxes, labels
 
 
-class Lambda(object):
-    """Applies a lambda as a transform."""
-
-    def __init__(self, lambd):
-        assert isinstance(lambd, types.LambdaType)
-        self.lambd = lambd
-
-    def __call__(self, img, boxes=None, labels=None):
-        return self.lambd(img, boxes, labels)
-
-
 class ConvertFromInts(object):
     def __call__(self, image, boxes=None, labels=None):
-        return image.astype(np.float32), boxes, labels
-
-
-class SubtractMeans(object):
-    def __init__(self, mean):
-        self.mean = np.array(mean, dtype=np.float32)
-
-    def __call__(self, image, boxes=None, labels=None):
-        image = image.astype(np.float32)
-        image -= self.mean
         return image.astype(np.float32), boxes, labels
 
 
@@ -165,9 +135,9 @@ class ConvertColor(object):
 
     def __call__(self, image, boxes=None, labels=None):
         if self.current == 'BGR' and self.transform == 'HSV':
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
         elif self.current == 'HSV' and self.transform == 'BGR':
-            image = cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
+            image = cv2.cvtColor(image, cv2.COLOR_HSV2RGB)
         else:
             raise NotImplementedError
         return image, boxes, labels
@@ -206,15 +176,6 @@ class ToCV2Image(object):
         return (
             tensor.cpu().numpy().astype(np.float32).transpose((1, 2, 0)),
             boxes,
-            labels,
-        )
-
-
-class ToTensor(object):
-    def __call__(self, cvimage, boxes=None, labels=None):
-        return (
-            f.to_tensor(cvimage),
-            torch.from_numpy(boxes),
             labels,
         )
 
@@ -410,30 +371,44 @@ class PhotometricDistort(object):
         return self.rand_light_noise(im, boxes, labels)
 
 
+class ToTensor:
+    def __call__(self, image, boxes, labels):
+        tensor_im = transforms.functional.to_tensor(image)
+        tensor_boxes = torch.FloatTensor(boxes)
+        tensor_targets = torch.FloatTensor(labels)
+        return tensor_im, tensor_boxes, tensor_targets
+
+
+class Normalize:
+    def __call__(self, image, boxes, labels):
+        im = transforms.functional.normalize(
+            image, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+        )
+        return im, boxes, labels
+
+
 class SSDAugmentation(object):
     def __init__(self, size=300, mean=(104, 117, 123), train=True):
         self.mean = mean
         self.size = size
         if train:
             transforms = [
-                ToStandardForm(),
                 ConvertFromInts(),
+                ToAbsoluteCoords(),
                 PhotometricDistort(),
                 Expand(self.mean),
                 RandomSampleCrop(),
                 RandomMirror(),
                 ToPercentCoords(),
                 Resize(self.size),
-                SubtractMeans(self.mean),
                 ToTensor(),
+                Normalize(),
             ]
         else:
             transforms = [
-                ToStandardForm(),
-                ConvertFromInts(),
                 Resize(self.size),
-                SubtractMeans(self.mean),
                 ToTensor(),
+                Normalize(),
             ]
         self.augment = Compose(transforms)
 
