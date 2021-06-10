@@ -15,6 +15,16 @@ from model.utils.data import HDF5Dataset
 from model.utils.evaluation import calculate_true_positives, evaluate, interpolate
 
 
+def calc_dice(metrics, class_subset):
+    vals = []
+    for k in class_subset:
+        tp = metrics[k]['tp']
+        fp = metrics[k]['fp']
+        fn = metrics[k]['ground_truths'] - tp
+        vals.append( tp / (tp + 0.5 * (fp + fn)))
+    return np.mean(vals)
+
+
 def calc_map(metrics, class_subset):
     aps = [metrics[cls]['average_precision'] for cls in class_subset]
     return np.mean(aps)

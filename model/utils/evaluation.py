@@ -28,6 +28,23 @@ def interpolate(precision: np.ndarray, recall: np.ndarray) -> np.ndarray:
         interpolation.append(np.max(pre[rec >= p]))
     return np.array(interpolation)
 
+def calculate_positive_localizations(
+    detections: torch.Tensor, ground_truths: torch.Tensor
+) -> torch.Tensor:
+    """Return list labeling detections as positive localizations
+    i.e. whether or not the detection matches a GT 
+
+    :param detections: Detections in point form [N,4], ordered by precedence
+        i.e. competing detections are resolved by lowest index
+    :type detections: class:`torch.Tensor`
+    :param ground_truths: ground truths in point form [M, 4].
+    :type detections: class:`torch.Tensor`
+    :return: Tensor[N] containing True if the corresponding detection matches a GT
+    :rtype: `torch.Tensor`
+    """
+    iou = jaccard(detections, ground_truths)
+    positive = torch.any(iou > 0.5, dim=1)
+    return positive
 
 def calculate_true_positives(
     detections: torch.Tensor, ground_truths: torch.Tensor
@@ -101,11 +118,16 @@ def evaluate(model, dataset, class_subset, quiet=True):
                 dets = dets[mask, ...]
                 sorted_conf, order_idx = dets[:, 0].sort(descending=True)
                 tps = calculate_true_positives(dets[order_idx, 1:], truths[:, :4])
+                localizations = calculate_positive_localizations(
+                    dets[order_idx, 1:],
+                    targets[: ,:4],
+                )
                 sharpness = calculate_detection_sharpness(
                     dets[order_idx, 1:], un_augment(image)
                 )
                 file_dict = {
                     'tps': tps,
+                    'localizations': localizations,
                     'sharpness': sharpness,
                     'confs': sorted_conf,
                     'file': file,
@@ -136,7 +158,7 @@ def evaluate(model, dataset, class_subset, quiet=True):
         }
     gt_table = []
     fn_table = []
-    detection_table = {'sharpness': [], 'confidence': [], 'tp': []}
+    detection_table = {'sharpness': [], 'confidence': [], 'tp': [], 'gt_match': []}
     for cls in predictions.values():
         for example in cls:
             tp = example['tps'].ge(0)
@@ -144,6 +166,7 @@ def evaluate(model, dataset, class_subset, quiet=True):
             detection_table['sharpness'].extend(example['sharpness'])
             detection_table['confidence'].extend(example['confs'].tolist())
             detection_table['tp'].extend(tp.tolist())
+            detection_table['gt_match'].extend(example['localizations'].tolist())
 
             gt_id = example['tps'][tp]
             file = example['file']
