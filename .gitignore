@@ -5,6 +5,13 @@ saves/
 detections/
 tmp/
 tags.lock
+
+experiments/**/*.pkl
+experiments/**/*.pth
+experiments/**/*.pdf
+experiments/**/*.png
+experiments/**/*.xlsx
+
 # Created by https://www.toptal.com/developers/gitignore/api/macos,python,vscode,tags
 # Edit at https://www.toptal.com/developers/gitignore?templates=macos,python,vscode,tags
 
