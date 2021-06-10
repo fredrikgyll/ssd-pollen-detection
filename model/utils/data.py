@@ -1,3 +1,4 @@
+import json
 import pickle
 from pathlib import Path
 
@@ -66,11 +67,11 @@ class HDF5Dataset:
 
 
 class AstmaDataset:
-    def __init__(self, root: Path, mode: str, transform) -> None:
+    def __init__(self, root: Path, name: str, mode: str, transform) -> None:
         self.transform = transform
-        self.bboxes = pickle.load((root / f'annotations/{mode}.pkl').open('rb'))
+        self.bboxes = pickle.loads((root / f'annotations/all.pkl').read_bytes())
+        self.images = json.loads((root / f'datasets/{name}.json').read_text())[mode]
         self.image_dir = root / 'Images'
-        self.images = list(sorted(self.bboxes.keys()))
         self.labels = ['poaceae', 'corylus', 'alnus']
 
     def __getitem__(self, idx):
@@ -82,7 +83,7 @@ class AstmaDataset:
         target = self.bboxes[file]
         target = target.astype(float)
         target[:, :4] /= 2
-        target = target[target[:, 4] != 3, ...]
+        # target = target[target[:, 4] != 3, ...]
 
         im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
 
