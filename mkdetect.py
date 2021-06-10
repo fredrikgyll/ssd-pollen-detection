@@ -2,12 +2,12 @@ import argparse
 from os import sep
 from pathlib import Path
 
-import torch
 import cv2
+import torch
 from tqdm.auto import tqdm
 
 from model.ssd import make_ssd
-from model.utils.augmentations import SSDAugmentation
+from model.utils.augmentations import DeNormalize, SSDAugmentation
 from model.utils.data import HDF5Dataset
 
 parser = argparse.ArgumentParser(description='Train SSD300 model')
@@ -55,6 +55,7 @@ if __name__ == "__main__":
 
     transforms = SSDAugmentation(train=False)
     dataset = HDF5Dataset(args.data, 'balanced1', 'test', transforms)
+    denorm = DeNormalize()
 
     model = make_ssd(phase='test', num_classes=len(dataset.labels) + 1)
     model_state = torch.load(args.checkpoint, map_location=torch.device('cpu'))
@@ -70,36 +71,40 @@ if __name__ == "__main__":
         file = dataset.names[i]
         try:
             image, targets = dataset[i]
-        except:
+        except ValueError:
             print('error:', i, file)
             continue
-
-        if args.images:
-            im = image.numpy().transpose(1, 2, 0)
-            cv2.imwrite(str(im_dir / (file + '.jpg')), im)
 
         gt_lines = [
             f'{CLASSES[gt[4]]} {" ".join(str(x) for x in gt[:4])}'
             for gt in clean_gt(targets, dim)
         ]
         det_lines = []
+        if args.cuda:
+            image = image.cuda()
+
         with torch.no_grad():
-            if args.cuda:
-                image = image.cuda()
             detections = model(image.unsqueeze(0))
-            for j, name in enumerate(CLASSES, start=1):
-                dets = detections[0, j, ...]  # only one class which is nr. 1
-                mask = dets[:, 0].gt(0.0)
-                if mask.any():
-                    dets = dets[mask, ...]
-                    confs, boxes = torch.split(dets, [1, 4], dim=1)
-                    confs, boxes = clean_pred(confs, boxes, dim)
-                    det_lines.extend(
-                        [
-                            f'{name} {conf} {" ".join(str(b) for b in bounds)}'
-                            for conf, bounds in zip(confs, boxes)
-                        ]
-                    )
+
+        for j, name in enumerate(CLASSES, start=1):
+            dets = detections[0, j, ...]  # only one class which is nr. 1
+            mask = dets[:, 0].gt(0.0)
+            if mask.any():
+                dets = dets[mask, ...]
+                confs, boxes = torch.split(dets, [1, 4], dim=1)
+                confs, boxes = clean_pred(confs, boxes, dim)
+                det_lines.extend(
+                    [
+                        f'{name} {conf} {" ".join(str(b) for b in bounds)}'
+                        for conf, bounds in zip(confs, boxes)
+                    ]
+                )
+
+        if args.images:
+            im, *_ = denorm(image, None, None)
+            im = (im * 255).cpu().numpy().transpose(1, 2, 0)
+            cv2.imwrite(str(im_dir / (file + '.jpg')), im)
+
         out_name = file + '.txt'
         gt_file = gt_dir / out_name
         det_file = det_dir / out_name

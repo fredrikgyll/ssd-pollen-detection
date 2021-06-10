@@ -19,11 +19,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "-q", "--quiet", help="minimalistic console output.", action="store_true"
 )
-# argparse receiving list of classes to be ignored (e.g., python main.py --ignore person book)
+# argparse receiving list of classes to be ignored
+# e.g., python main.py --ignore person book
 parser.add_argument(
     "-i", "--ignore", nargs="+", default=[], type=str, help="ignore a list of classes."
 )
-# argparse receiving list of classes with specific IoU (e.g., python main.py --set-class-iou person 0.7)
+# argparse receiving list of classes with specific IoU
+# e.g., python main.py --set-class-iou person 0.7
 parser.add_argument(
     "--set-class-iou", nargs="+", type=str, help="set IoU for a specific class."
 )
@@ -90,7 +92,8 @@ def log_average_miss_rate(prec, rec, num_images):
     # Use 9 evenly spaced reference points in log-space
     ref = np.logspace(-2.0, 0.0, num=9)
     for i, ref_i in enumerate(ref):
-        # np.where() will always find at least 1 index, since min(ref) = 0.01 and min(fppi_tmp) = -1.0
+        # np.where() will always find at least 1 index
+        # since min(ref) = 0.01 and min(fppi_tmp) = -1.0
         j = np.where(fppi_tmp <= ref_i)[-1][-1]
         ref[i] = mr_tmp[j]
 
@@ -255,8 +258,14 @@ for txt_file in ground_truth_files_list:
                 " Expected: <class_name> <left> <top> <right> <bottom> ['difficult']\n"
             )
             error_msg += " Received: " + line
-            error_msg += "\n\nIf you have a <class_name> with spaces between words you should remove them\n"
-            error_msg += 'by running the script "remove_space.py" or "rename_class.py" in the "extra/" folder.'
+            error_msg += (
+                "\n\nIf you have a <class_name> with spaces between words "
+                "you should remove them\n"
+            )
+            error_msg += (
+                'by running the script "remove_space.py" or "rename_class.py" '
+                'in the "extra/" folder.'
+            )
             error(error_msg)
         # check if class is in the ignore list, if yes skip
         if class_name in args.ignore:
@@ -345,7 +354,6 @@ for class_index, class_name in enumerate(gt_classes):
         if class_index == 0:
             if not temp_path.is_file():
                 error_msg = "Error. File not found: {}\n".format(temp_path)
-                error_msg += "(You can avoid this error message by running extra/intersect-gt-and-dr.py)"
                 error(error_msg)
         lines = file_lines_to_list(txt_file)
         for line in lines:
@@ -353,7 +361,6 @@ for class_index, class_name in enumerate(gt_classes):
                 tmp_class_name, confidence, left, top, right, bottom = line.split()
             except ValueError:
                 error_msg = "Error: File " + txt_file + " in the wrong format.\n"
-                error_msg += " Expected: <class_name> <confidence> <left> <top> <right> <bottom>\n"
                 error_msg += " Received: " + line
                 error(error_msg)
             if tmp_class_name == class_name:
@@ -545,7 +552,7 @@ with open(output_files_path / "output.txt", "a") as output_file:
  Finish counting true positives
 """
 for class_name in dr_classes:
-    # if class exists in detection-result but not in ground-truth then there are no true positives in that class
+    # if class exists in DR but not in GT then there are no TPs in that class
     if class_name not in gt_classes:
         count_true_positives[class_name] = 0
 # print(count_true_positives)

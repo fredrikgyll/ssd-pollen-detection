@@ -50,7 +50,7 @@ if __name__ == "__main__":
         file = dataset.names[i]
         try:
             image, targets = dataset[i]
-        except:
+        except ValueError:
             print('error:', i, file)
             continue
         with torch.no_grad():

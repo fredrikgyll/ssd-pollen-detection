@@ -39,11 +39,12 @@ class CDNConnector:
         return response.json()
 
     def get_file(self, cdn_path, download_path=None):
-        """
-        download file from your cdn storage \n
-        cdn_path storage path for the file, (including file name), in cdn, use / as seperator eg, 'images/logo.png' \n
-        download_path (default=None, stores in your present working directory) \n
-        pass your desired download path with file name, will rewrite already existing files, if do not exists create them.
+        """Download file from your cdn storage
+        cdn_path: storage path for the file (including file name) in cdn,
+            use / as seperator e.g. 'images/logo.png'
+        download_path: (default=None, stores in your present working directory)
+            pass your desired download path with file name,
+            will rewrite already existing files, if do not exists create them.
 
         Note, directory will not be created
         """

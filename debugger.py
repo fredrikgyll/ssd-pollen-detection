@@ -122,8 +122,8 @@ def evaluate_model():
 
     root = Path('/Users/fredrikg/Projects/pollendb1/data')
 
-    transforms = get_transform(train=False)
-    dataset = Pollene1Dataset(root, 'test', transforms)
+    transform = SSDAugmentation(train=False)
+    dataset = Pollene1Dataset(root, 'test', transform)
     data_loader = DataLoader(
         dataset,
         batch_size=8,
@@ -222,7 +222,6 @@ def infer2():
         dets = detections[0, i, ...]  # only one class which is nr. 1
         mask = dets[:, 0].gt(0.2)
         dets = dets[mask, ...]
-        out_boxes = dets[:, 1:]
         out.append(dets.data)
 
     img, _, labels = denorm(img, boxes, labels)
@@ -245,10 +244,12 @@ def infer2():
     for (*xy, w, h), l in zip(boxes, labels.int()):
         ax.add_patch(patches.Rectangle(xy, w, h, edgecolor='green', fill=False))
         ax.text(*offsets['gt'](xy, w, h), dataset.labels[l], color='green', fontsize=10)
-    for l, boxes, confs in zip(dataset.labels, out_bbox, out_conf):
+    for lab, boxes, confs in zip(dataset.labels, out_bbox, out_conf):
         for (*xy, w, h), c in zip(boxes, confs):
-            ax.add_patch(patches.Rectangle(xy, w, h, edgecolor=colors[l], fill=False))
-            ax.text(*offsets[l](xy, w, h), f'{l} {c:.2f}', color=colors[l], fontsize=10)
+            ax.add_patch(patches.Rectangle(xy, w, h, edgecolor=colors[lab], fill=False))
+            ax.text(
+                *offsets[l](xy, w, h), f'{lab} {c:.2f}', color=colors[lab], fontsize=10
+            )
     ax.set_axis_off()
     plt.show()
 
