@@ -11,7 +11,7 @@ class Pollene1Dataset:
         self.bboxes = pickle.load((root / f'annotations/new/{mode}.pkl').open('rb'))
         self.image_dir = root / mode
         self.images = list(sorted(self.bboxes.keys()))
-        self.dims = np.array([640, 512, 640, 512])
+        # self.dims = np.array([640, 512, 640, 512])
 
     def __getitem__(self, idx):
         file = self.images[idx]
@@ -20,7 +20,7 @@ class Pollene1Dataset:
 
         target = self.bboxes[file]
         target = target.astype(float)
-        target[:, :4] /= self.dims
+        # target[:, :4] /= self.dims
 
         im, bboxes, labels = self.transform(img, target[:, :4], target[:, 4])
 
