@@ -1,29 +1,30 @@
-import subprocess
+from model.utils.bunny import CDNConnector
+from pathlib import Path
+from dotenv import load_dotenv
+import os
 
-HOST = 'simple-hybel'
-REMOTE_DIR = '/mnt/ext/saves/'
-LOCAL_DIR = 'saves/'
-MODEL_NAME = 'ssd_last'
-MODEL_EXT = 'pth'
+load_dotenv()
 
-command = subprocess.run(['ssh', HOST, f'ls {REMOTE_DIR}'], capture_output=True)
+STORAGE_ZONE = '/pollen'
+LOCAL_DIR = Path('saves/')
 
-list_files = command.stdout.decode().split()
+conn = CDNConnector(os.getenv('BUNNY_API_KEY'), STORAGE_ZONE)
+
+list_files = [
+    Path(obj['Path']) / obj['ObjectName']
+    for obj in conn.get_storaged_objects('models/')
+]
+
+
 
 print("Choose a number:")
 
-print(*[f"{i}) {file}" for i, file in enumerate(list_files)], sep='\n')
+print(*[f"{i}) {file.stem}" for i, file in enumerate(list_files)], sep='\n')
 number = int(input('number: '))
 
 chosen = list_files[number]
 print(f'Downloading model {chosen}')
-
-command = subprocess.run(
-    [
-        'scp',
-        f'{HOST}:{REMOTE_DIR}{chosen}/{MODEL_NAME}.{MODEL_EXT}',
-        f'{LOCAL_DIR}{chosen}.{MODEL_EXT}',
-    ]
-)
+pth = str(chosen.relative_to(STORAGE_ZONE))
+conn.get_file(pth, LOCAL_DIR / chosen.name)
 
 print("Done.")

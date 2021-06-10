@@ -46,8 +46,6 @@ class CDNConnector:
 
         Note, directory will not be created
         """
-        cdn_path = cdn_path.rstrip("/")
-
 
         request_url = self.base_url + cdn_path
         with requests.get(request_url, headers=self.headers, stream=True) as r:
