@@ -162,7 +162,7 @@ class SSDAugmentation(object):
                 ColorSift(),  # boxes _ -> _
                 Normalize(),  # boxes _ -> _
                 ChannelSuffle(),  # boxes _ -> _
-                RandomSubSample(out_dim=1000),  # boxes abs -> abs
+                RandomSubSample(out_dim=500),  # boxes abs -> abs
                 VerticalFlip(),  # boxes abs -> abs
                 HorizontalFlip(),  # boxes abs -> abs
                 ToPercentCoords(),  # boxes abs -> %
@@ -173,7 +173,7 @@ class SSDAugmentation(object):
             transforms = [
                 CV2Tensor(),  # boxes _ -> _
                 Normalize(),  # boxes _ -> _
-                RandomSubSample(out_dim=1000),  # boxes abs -> abs
+                RandomSubSample(out_dim=500),  # boxes abs -> abs
                 ToPercentCoords(),  # boxes abs -> %
                 Resize(size=self.size),  # boxes % -> %
                 TargetsToTensor(),  # boxes _ -> _

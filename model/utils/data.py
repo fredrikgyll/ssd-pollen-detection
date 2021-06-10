@@ -43,8 +43,8 @@ class HDF5Dataset:
 
     def _open_hdf5(self):
         self.dataset = h5py.File(self.data_file, 'r')
-        self.images = self.dataset['images']
-        self.annotations = self.dataset['annotations']
+        self.images = self.dataset['images@2x']
+        self.annotations = self.dataset['annotations@2x']
 
     def __getitem__(self, idx):
         if not hasattr(self, 'dataset'):

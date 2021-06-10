@@ -77,7 +77,7 @@ def train(args):
     # Data
     root = args.data
     transforms = SSDAugmentation()
-    dataset = HDF5Dataset(root, 'random', 'train', transforms)
+    dataset = HDF5Dataset(root, 'balanced1', 'train', transforms)
     logger(f'Iterations in dataset {len(dataset)//batch_size}')
     data_loader = data.DataLoader(
         dataset,
